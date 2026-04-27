@@ -8,9 +8,528 @@
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
+});
+
+/**
+ * @summary Get the current user's brokerage account snapshot
+ */
+export const GetMyAccountResponse = zod.object({
+  userId: zod.string(),
+  displayName: zod.string(),
+  cashBalance: zod.number(),
+  totalEquity: zod.number(),
+  portfolioValue: zod.number(),
+  dayChange: zod.number(),
+  dayChangePercent: zod.number(),
+  buyingPower: zod.number(),
+});
+
+/**
+ * @summary Aggregated dashboard data (balances, top movers, recent activity)
+ */
+export const GetDashboardSummaryResponse = zod.object({
+  account: zod.object({
+    userId: zod.string(),
+    displayName: zod.string(),
+    cashBalance: zod.number(),
+    totalEquity: zod.number(),
+    portfolioValue: zod.number(),
+    dayChange: zod.number(),
+    dayChangePercent: zod.number(),
+    buyingPower: zod.number(),
+  }),
+  equityCurve: zod.object({
+    range: zod.string(),
+    points: zod.array(
+      zod.object({
+        t: zod.coerce.date(),
+        v: zod.number(),
+      }),
+    ),
+    startValue: zod.number(),
+    endValue: zod.number(),
+    change: zod.number(),
+    changePercent: zod.number(),
+  }),
+  positions: zod.array(
+    zod.object({
+      id: zod.number(),
+      symbol: zod.string(),
+      name: zod.string(),
+      sector: zod.string(),
+      quantity: zod.number(),
+      averageCost: zod.number(),
+      currentPrice: zod.number(),
+      marketValue: zod.number(),
+      unrealizedPnl: zod.number(),
+      unrealizedPnlPercent: zod.number(),
+      dayChange: zod.number(),
+      dayChangePercent: zod.number(),
+    }),
+  ),
+  watchlist: zod.array(
+    zod.object({
+      symbol: zod.string(),
+      name: zod.string(),
+      sector: zod.string(),
+      price: zod.number(),
+      change: zod.number(),
+      changePercent: zod.number(),
+      previousClose: zod.number(),
+    }),
+  ),
+  movers: zod.object({
+    gainers: zod.array(
+      zod.object({
+        symbol: zod.string(),
+        name: zod.string(),
+        sector: zod.string(),
+        price: zod.number(),
+        change: zod.number(),
+        changePercent: zod.number(),
+        previousClose: zod.number(),
+      }),
+    ),
+    losers: zod.array(
+      zod.object({
+        symbol: zod.string(),
+        name: zod.string(),
+        sector: zod.string(),
+        price: zod.number(),
+        change: zod.number(),
+        changePercent: zod.number(),
+        previousClose: zod.number(),
+      }),
+    ),
+    mostActive: zod.array(
+      zod.object({
+        symbol: zod.string(),
+        name: zod.string(),
+        sector: zod.string(),
+        price: zod.number(),
+        change: zod.number(),
+        changePercent: zod.number(),
+        previousClose: zod.number(),
+      }),
+    ),
+  }),
+  indices: zod.array(
+    zod.object({
+      symbol: zod.string(),
+      name: zod.string(),
+      value: zod.number(),
+      change: zod.number(),
+      changePercent: zod.number(),
+    }),
+  ),
+  recentOrders: zod.array(
+    zod.object({
+      id: zod.number(),
+      symbol: zod.string(),
+      name: zod.string(),
+      side: zod.enum(["buy", "sell"]),
+      quantity: zod.number(),
+      price: zod.number(),
+      total: zod.number(),
+      status: zod.enum(["filled", "pending", "rejected"]),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  recentTransactions: zod.array(
+    zod.object({
+      id: zod.number(),
+      type: zod.enum(["deposit", "buy", "sell", "dividend", "fee"]),
+      description: zod.string(),
+      amount: zod.number(),
+      symbol: zod.string().optional(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  news: zod.array(
+    zod.object({
+      id: zod.string(),
+      headline: zod.string(),
+      source: zod.string(),
+      category: zod.string(),
+      publishedAt: zod.coerce.date(),
+      symbols: zod.array(zod.string()),
+      summary: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Time-series equity curve for the user account
+ */
+export const GetAccountPerformanceQueryParams = zod.object({
+  range: zod.enum(["1D", "1W", "1M", "3M", "1Y", "ALL"]).optional(),
+});
+
+export const GetAccountPerformanceResponse = zod.object({
+  range: zod.string(),
+  points: zod.array(
+    zod.object({
+      t: zod.coerce.date(),
+      v: zod.number(),
+    }),
+  ),
+  startValue: zod.number(),
+  endValue: zod.number(),
+  change: zod.number(),
+  changePercent: zod.number(),
+});
+
+/**
+ * @summary List account transactions (deposits, trades, dividends)
+ */
+export const ListTransactionsResponseItem = zod.object({
+  id: zod.number(),
+  type: zod.enum(["deposit", "buy", "sell", "dividend", "fee"]),
+  description: zod.string(),
+  amount: zod.number(),
+  symbol: zod.string().optional(),
+  createdAt: zod.coerce.date(),
+});
+export const ListTransactionsResponse = zod.array(ListTransactionsResponseItem);
+
+/**
+ * @summary Get watched symbols with quotes
+ */
+export const GetWatchlistResponseItem = zod.object({
+  symbol: zod.string(),
+  name: zod.string(),
+  sector: zod.string(),
+  price: zod.number(),
+  change: zod.number(),
+  changePercent: zod.number(),
+  previousClose: zod.number(),
+});
+export const GetWatchlistResponse = zod.array(GetWatchlistResponseItem);
+
+/**
+ * @summary Add a symbol to the watchlist
+ */
+export const AddToWatchlistBody = zod.object({
+  symbol: zod.string(),
+});
+
+/**
+ * @summary Remove a symbol from the watchlist
+ */
+export const RemoveFromWatchlistParams = zod.object({
+  symbol: zod.coerce.string(),
+});
+
+/**
+ * @summary List quotes for popular symbols
+ */
+export const ListQuotesQueryParams = zod.object({
+  symbols: zod.coerce
+    .string()
+    .optional()
+    .describe("Comma-separated symbols (default returns popular set)"),
+});
+
+export const ListQuotesResponseItem = zod.object({
+  symbol: zod.string(),
+  name: zod.string(),
+  sector: zod.string(),
+  price: zod.number(),
+  change: zod.number(),
+  changePercent: zod.number(),
+  previousClose: zod.number(),
+});
+export const ListQuotesResponse = zod.array(ListQuotesResponseItem);
+
+/**
+ * @summary Top gainers, losers, and most active symbols
+ */
+export const GetMarketMoversResponse = zod.object({
+  gainers: zod.array(
+    zod.object({
+      symbol: zod.string(),
+      name: zod.string(),
+      sector: zod.string(),
+      price: zod.number(),
+      change: zod.number(),
+      changePercent: zod.number(),
+      previousClose: zod.number(),
+    }),
+  ),
+  losers: zod.array(
+    zod.object({
+      symbol: zod.string(),
+      name: zod.string(),
+      sector: zod.string(),
+      price: zod.number(),
+      change: zod.number(),
+      changePercent: zod.number(),
+      previousClose: zod.number(),
+    }),
+  ),
+  mostActive: zod.array(
+    zod.object({
+      symbol: zod.string(),
+      name: zod.string(),
+      sector: zod.string(),
+      price: zod.number(),
+      change: zod.number(),
+      changePercent: zod.number(),
+      previousClose: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Major US indices snapshot
+ */
+export const GetMarketIndicesResponseItem = zod.object({
+  symbol: zod.string(),
+  name: zod.string(),
+  value: zod.number(),
+  change: zod.number(),
+  changePercent: zod.number(),
+});
+export const GetMarketIndicesResponse = zod.array(GetMarketIndicesResponseItem);
+
+/**
+ * @summary Curated market news headlines
+ */
+export const GetMarketNewsResponseItem = zod.object({
+  id: zod.string(),
+  headline: zod.string(),
+  source: zod.string(),
+  category: zod.string(),
+  publishedAt: zod.coerce.date(),
+  symbols: zod.array(zod.string()),
+  summary: zod.string(),
+});
+export const GetMarketNewsResponse = zod.array(GetMarketNewsResponseItem);
+
+/**
+ * @summary Get a single live quote
+ */
+export const GetQuoteParams = zod.object({
+  symbol: zod.coerce.string(),
+});
+
+export const GetQuoteResponse = zod.object({
+  symbol: zod.string(),
+  name: zod.string(),
+  sector: zod.string(),
+  price: zod.number(),
+  change: zod.number(),
+  changePercent: zod.number(),
+  previousClose: zod.number(),
+  open: zod.number(),
+  dayHigh: zod.number(),
+  dayLow: zod.number(),
+  yearHigh: zod.number(),
+  yearLow: zod.number(),
+  marketCap: zod.number(),
+  volume: zod.number(),
+  peRatio: zod.number(),
+  dividendYield: zod.number(),
+  description: zod.string(),
+});
+
+/**
+ * @summary OHLC time-series chart for a symbol
+ */
+export const GetSymbolChartParams = zod.object({
+  symbol: zod.coerce.string(),
+});
+
+export const GetSymbolChartQueryParams = zod.object({
+  range: zod.enum(["1D", "1W", "1M", "3M", "1Y", "ALL"]).optional(),
+});
+
+export const GetSymbolChartResponse = zod.object({
+  symbol: zod.string(),
+  range: zod.string(),
+  candles: zod.array(
+    zod.object({
+      t: zod.coerce.date(),
+      o: zod.number(),
+      h: zod.number(),
+      l: zod.number(),
+      c: zod.number(),
+      v: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary List positions held by the current user
+ */
+export const ListPositionsResponseItem = zod.object({
+  id: zod.number(),
+  symbol: zod.string(),
+  name: zod.string(),
+  sector: zod.string(),
+  quantity: zod.number(),
+  averageCost: zod.number(),
+  currentPrice: zod.number(),
+  marketValue: zod.number(),
+  unrealizedPnl: zod.number(),
+  unrealizedPnlPercent: zod.number(),
+  dayChange: zod.number(),
+  dayChangePercent: zod.number(),
+});
+export const ListPositionsResponse = zod.array(ListPositionsResponseItem);
+
+/**
+ * @summary Sector and asset allocation breakdown
+ */
+export const GetAllocationResponse = zod.object({
+  bySector: zod.array(
+    zod.object({
+      label: zod.string(),
+      value: zod.number(),
+      percent: zod.number(),
+    }),
+  ),
+  byAsset: zod.array(
+    zod.object({
+      label: zod.string(),
+      value: zod.number(),
+      percent: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary List orders for the current user
+ */
+export const ListOrdersResponseItem = zod.object({
+  id: zod.number(),
+  symbol: zod.string(),
+  name: zod.string(),
+  side: zod.enum(["buy", "sell"]),
+  quantity: zod.number(),
+  price: zod.number(),
+  total: zod.number(),
+  status: zod.enum(["filled", "pending", "rejected"]),
+  createdAt: zod.coerce.date(),
+});
+export const ListOrdersResponse = zod.array(ListOrdersResponseItem);
+
+/**
+ * @summary Place a buy or sell market order
+ */
+export const PlaceOrderBody = zod.object({
+  symbol: zod.string(),
+  side: zod.enum(["buy", "sell"]),
+  quantity: zod.number(),
+});
+
+/**
+ * @summary Create a Stripe Checkout session to fund the account
+ */
+export const CreateDepositCheckoutBody = zod.object({
+  amount: zod.number().describe("USD deposit amount"),
+});
+
+export const CreateDepositCheckoutResponse = zod.object({
+  url: zod.string(),
+  sessionId: zod.string(),
+});
+
+/**
+ * @summary Confirm a completed checkout session and credit the account
+ */
+export const ConfirmDepositBody = zod.object({
+  sessionId: zod.string(),
+});
+
+export const ConfirmDepositResponse = zod.object({
+  userId: zod.string(),
+  displayName: zod.string(),
+  cashBalance: zod.number(),
+  totalEquity: zod.number(),
+  portfolioValue: zod.number(),
+  dayChange: zod.number(),
+  dayChangePercent: zod.number(),
+  buyingPower: zod.number(),
+});
+
+/**
+ * @summary List all conversations for the current user
+ */
+export const ListOpenaiConversationsResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+export const ListOpenaiConversationsResponse = zod.array(
+  ListOpenaiConversationsResponseItem,
+);
+
+/**
+ * @summary Create a new conversation
+ */
+export const CreateOpenaiConversationBody = zod.object({
+  title: zod.string(),
+});
+
+/**
+ * @summary Get a conversation with messages
+ */
+export const GetOpenaiConversationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetOpenaiConversationResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  createdAt: zod.coerce.date(),
+  messages: zod.array(
+    zod.object({
+      id: zod.number(),
+      conversationId: zod.number(),
+      role: zod.string(),
+      content: zod.string(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Delete a conversation
+ */
+export const DeleteOpenaiConversationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List messages
+ */
+export const ListOpenaiMessagesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListOpenaiMessagesResponseItem = zod.object({
+  id: zod.number(),
+  conversationId: zod.number(),
+  role: zod.string(),
+  content: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+export const ListOpenaiMessagesResponse = zod.array(
+  ListOpenaiMessagesResponseItem,
+);
+
+/**
+ * @summary Send a message and stream response
+ */
+export const SendOpenaiMessageParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SendOpenaiMessageBody = zod.object({
+  content: zod.string(),
 });

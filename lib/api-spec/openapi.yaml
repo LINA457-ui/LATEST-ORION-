@@ -10,13 +10,24 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: account
+    description: Investor account operations
+  - name: market
+    description: Market data and quotes
+  - name: trading
+    description: Trading and order operations
+  - name: portfolio
+    description: Portfolio and positions
+  - name: payments
+    description: Funding and Stripe payments
+  - name: openai
+    description: OpenAI AI chat assistant
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +35,413 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /account/me:
+    get:
+      operationId: getMyAccount
+      tags: [account]
+      summary: Get the current user's brokerage account snapshot
+      responses:
+        "200":
+          description: Account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountSnapshot"
+  /account/dashboard:
+    get:
+      operationId: getDashboardSummary
+      tags: [account]
+      summary: Aggregated dashboard data (balances, top movers, recent activity)
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /account/performance:
+    get:
+      operationId: getAccountPerformance
+      tags: [account]
+      summary: Time-series equity curve for the user account
+      parameters:
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["1D", "1W", "1M", "3M", "1Y", "ALL"]
+      responses:
+        "200":
+          description: Equity curve
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EquityCurve"
+  /account/transactions:
+    get:
+      operationId: listTransactions
+      tags: [account]
+      summary: List account transactions (deposits, trades, dividends)
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+  /account/watchlist:
+    get:
+      operationId: getWatchlist
+      tags: [account]
+      summary: Get watched symbols with quotes
+      responses:
+        "200":
+          description: Watchlist
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quote"
+    post:
+      operationId: addToWatchlist
+      tags: [account]
+      summary: Add a symbol to the watchlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddWatchlistBody"
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+  /account/watchlist/{symbol}:
+    delete:
+      operationId: removeFromWatchlist
+      tags: [account]
+      summary: Remove a symbol from the watchlist
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Removed
+  /market/quotes:
+    get:
+      operationId: listQuotes
+      tags: [market]
+      summary: List quotes for popular symbols
+      parameters:
+        - name: symbols
+          in: query
+          required: false
+          description: Comma-separated symbols (default returns popular set)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quotes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quote"
+  /market/movers:
+    get:
+      operationId: getMarketMovers
+      tags: [market]
+      summary: Top gainers, losers, and most active symbols
+      responses:
+        "200":
+          description: Movers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketMovers"
+  /market/indices:
+    get:
+      operationId: getMarketIndices
+      tags: [market]
+      summary: Major US indices snapshot
+      responses:
+        "200":
+          description: Indices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IndexQuote"
+  /market/news:
+    get:
+      operationId: getMarketNews
+      tags: [market]
+      summary: Curated market news headlines
+      responses:
+        "200":
+          description: News
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NewsItem"
+  /market/quote/{symbol}:
+    get:
+      operationId: getQuote
+      tags: [market]
+      summary: Get a single live quote
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteDetail"
+  /market/chart/{symbol}:
+    get:
+      operationId: getSymbolChart
+      tags: [market]
+      summary: OHLC time-series chart for a symbol
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["1D", "1W", "1M", "3M", "1Y", "ALL"]
+      responses:
+        "200":
+          description: Chart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SymbolChart"
+  /portfolio/positions:
+    get:
+      operationId: listPositions
+      tags: [portfolio]
+      summary: List positions held by the current user
+      responses:
+        "200":
+          description: Positions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Position"
+  /portfolio/allocation:
+    get:
+      operationId: getAllocation
+      tags: [portfolio]
+      summary: Sector and asset allocation breakdown
+      responses:
+        "200":
+          description: Allocation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Allocation"
+  /trading/orders:
+    get:
+      operationId: listOrders
+      tags: [trading]
+      summary: List orders for the current user
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+    post:
+      operationId: placeOrder
+      tags: [trading]
+      summary: Place a buy or sell market order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceOrderBody"
+      responses:
+        "201":
+          description: Order placed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+  /payments/deposit:
+    post:
+      operationId: createDepositCheckout
+      tags: [payments]
+      summary: Create a Stripe Checkout session to fund the account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDepositBody"
+      responses:
+        "200":
+          description: Checkout URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateDepositResponse"
+  /payments/confirm:
+    post:
+      operationId: confirmDeposit
+      tags: [payments]
+      summary: Confirm a completed checkout session and credit the account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmDepositBody"
+      responses:
+        "200":
+          description: Updated account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountSnapshot"
+  /openai/conversations:
+    get:
+      operationId: listOpenaiConversations
+      tags: [openai]
+      summary: List all conversations for the current user
+      responses:
+        "200":
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenaiConversation"
+    post:
+      operationId: createOpenaiConversation
+      tags: [openai]
+      summary: Create a new conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOpenaiConversationBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenaiConversation"
+  /openai/conversations/{id}:
+    get:
+      operationId: getOpenaiConversation
+      tags: [openai]
+      summary: Get a conversation with messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenaiConversationWithMessages"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenaiError"
+    delete:
+      operationId: deleteOpenaiConversation
+      tags: [openai]
+      summary: Delete a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+  /openai/conversations/{id}/messages:
+    get:
+      operationId: listOpenaiMessages
+      tags: [openai]
+      summary: List messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenaiMessage"
+    post:
+      operationId: sendOpenaiMessage
+      tags: [openai]
+      summary: Send a message and stream response
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendOpenaiMessageBody"
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream: {}
 components:
   schemas:
     HealthStatus:
@@ -33,4 +451,537 @@ components:
           type: string
       required:
         - status
-
+    AccountSnapshot:
+      type: object
+      properties:
+        userId:
+          type: string
+        displayName:
+          type: string
+        cashBalance:
+          type: number
+        totalEquity:
+          type: number
+        portfolioValue:
+          type: number
+        dayChange:
+          type: number
+        dayChangePercent:
+          type: number
+        buyingPower:
+          type: number
+      required:
+        - userId
+        - displayName
+        - cashBalance
+        - totalEquity
+        - portfolioValue
+        - dayChange
+        - dayChangePercent
+        - buyingPower
+    DashboardSummary:
+      type: object
+      properties:
+        account:
+          $ref: "#/components/schemas/AccountSnapshot"
+        equityCurve:
+          $ref: "#/components/schemas/EquityCurve"
+        positions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Position"
+        watchlist:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quote"
+        movers:
+          $ref: "#/components/schemas/MarketMovers"
+        indices:
+          type: array
+          items:
+            $ref: "#/components/schemas/IndexQuote"
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        recentTransactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        news:
+          type: array
+          items:
+            $ref: "#/components/schemas/NewsItem"
+      required:
+        - account
+        - equityCurve
+        - positions
+        - watchlist
+        - movers
+        - indices
+        - recentOrders
+        - recentTransactions
+        - news
+    EquityCurve:
+      type: object
+      properties:
+        range:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/EquityPoint"
+        startValue:
+          type: number
+        endValue:
+          type: number
+        change:
+          type: number
+        changePercent:
+          type: number
+      required:
+        - range
+        - points
+        - startValue
+        - endValue
+        - change
+        - changePercent
+    EquityPoint:
+      type: object
+      properties:
+        t:
+          type: string
+          format: date-time
+        v:
+          type: number
+      required:
+        - t
+        - v
+    Quote:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        sector:
+          type: string
+        price:
+          type: number
+        change:
+          type: number
+        changePercent:
+          type: number
+        previousClose:
+          type: number
+      required:
+        - symbol
+        - name
+        - sector
+        - price
+        - change
+        - changePercent
+        - previousClose
+    QuoteDetail:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        sector:
+          type: string
+        price:
+          type: number
+        change:
+          type: number
+        changePercent:
+          type: number
+        previousClose:
+          type: number
+        open:
+          type: number
+        dayHigh:
+          type: number
+        dayLow:
+          type: number
+        yearHigh:
+          type: number
+        yearLow:
+          type: number
+        marketCap:
+          type: number
+        volume:
+          type: number
+        peRatio:
+          type: number
+        dividendYield:
+          type: number
+        description:
+          type: string
+      required:
+        - symbol
+        - name
+        - sector
+        - price
+        - change
+        - changePercent
+        - previousClose
+        - open
+        - dayHigh
+        - dayLow
+        - yearHigh
+        - yearLow
+        - marketCap
+        - volume
+        - peRatio
+        - dividendYield
+        - description
+    IndexQuote:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        value:
+          type: number
+        change:
+          type: number
+        changePercent:
+          type: number
+      required:
+        - symbol
+        - name
+        - value
+        - change
+        - changePercent
+    MarketMovers:
+      type: object
+      properties:
+        gainers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quote"
+        losers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quote"
+        mostActive:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quote"
+      required:
+        - gainers
+        - losers
+        - mostActive
+    NewsItem:
+      type: object
+      properties:
+        id:
+          type: string
+        headline:
+          type: string
+        source:
+          type: string
+        category:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        symbols:
+          type: array
+          items:
+            type: string
+        summary:
+          type: string
+      required:
+        - id
+        - headline
+        - source
+        - category
+        - publishedAt
+        - symbols
+        - summary
+    SymbolChart:
+      type: object
+      properties:
+        symbol:
+          type: string
+        range:
+          type: string
+        candles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Candle"
+      required:
+        - symbol
+        - range
+        - candles
+    Candle:
+      type: object
+      properties:
+        t:
+          type: string
+          format: date-time
+        o:
+          type: number
+        h:
+          type: number
+        l:
+          type: number
+        c:
+          type: number
+        v:
+          type: number
+      required:
+        - t
+        - o
+        - h
+        - l
+        - c
+        - v
+    Position:
+      type: object
+      properties:
+        id:
+          type: integer
+        symbol:
+          type: string
+        name:
+          type: string
+        sector:
+          type: string
+        quantity:
+          type: number
+        averageCost:
+          type: number
+        currentPrice:
+          type: number
+        marketValue:
+          type: number
+        unrealizedPnl:
+          type: number
+        unrealizedPnlPercent:
+          type: number
+        dayChange:
+          type: number
+        dayChangePercent:
+          type: number
+      required:
+        - id
+        - symbol
+        - name
+        - sector
+        - quantity
+        - averageCost
+        - currentPrice
+        - marketValue
+        - unrealizedPnl
+        - unrealizedPnlPercent
+        - dayChange
+        - dayChangePercent
+    Allocation:
+      type: object
+      properties:
+        bySector:
+          type: array
+          items:
+            $ref: "#/components/schemas/AllocationSlice"
+        byAsset:
+          type: array
+          items:
+            $ref: "#/components/schemas/AllocationSlice"
+      required:
+        - bySector
+        - byAsset
+    AllocationSlice:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: number
+        percent:
+          type: number
+      required:
+        - label
+        - value
+        - percent
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        symbol:
+          type: string
+        name:
+          type: string
+        side:
+          type: string
+          enum: [buy, sell]
+        quantity:
+          type: number
+        price:
+          type: number
+        total:
+          type: number
+        status:
+          type: string
+          enum: [filled, pending, rejected]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - symbol
+        - name
+        - side
+        - quantity
+        - price
+        - total
+        - status
+        - createdAt
+    PlaceOrderBody:
+      type: object
+      properties:
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [buy, sell]
+        quantity:
+          type: number
+      required:
+        - symbol
+        - side
+        - quantity
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [deposit, buy, sell, dividend, fee]
+        description:
+          type: string
+        amount:
+          type: number
+        symbol:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - type
+        - description
+        - amount
+        - createdAt
+    AddWatchlistBody:
+      type: object
+      properties:
+        symbol:
+          type: string
+      required:
+        - symbol
+    CreateDepositBody:
+      type: object
+      properties:
+        amount:
+          type: number
+          description: USD deposit amount
+      required:
+        - amount
+    CreateDepositResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        sessionId:
+          type: string
+      required:
+        - url
+        - sessionId
+    ConfirmDepositBody:
+      type: object
+      properties:
+        sessionId:
+          type: string
+      required:
+        - sessionId
+    OpenaiConversation:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - createdAt
+    OpenaiMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        role:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - conversationId
+        - role
+        - content
+        - createdAt
+    CreateOpenaiConversationBody:
+      type: object
+      properties:
+        title:
+          type: string
+      required:
+        - title
+    SendOpenaiMessageBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+    OpenaiConversationWithMessages:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpenaiMessage"
+      required:
+        - id
+        - title
+        - createdAt
+        - messages
+    OpenaiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error

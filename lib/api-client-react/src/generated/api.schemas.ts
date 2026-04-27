@@ -8,3 +8,286 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface AccountSnapshot {
+  userId: string;
+  displayName: string;
+  cashBalance: number;
+  totalEquity: number;
+  portfolioValue: number;
+  dayChange: number;
+  dayChangePercent: number;
+  buyingPower: number;
+}
+
+export interface EquityPoint {
+  t: string;
+  v: number;
+}
+
+export interface EquityCurve {
+  range: string;
+  points: EquityPoint[];
+  startValue: number;
+  endValue: number;
+  change: number;
+  changePercent: number;
+}
+
+export interface Position {
+  id: number;
+  symbol: string;
+  name: string;
+  sector: string;
+  quantity: number;
+  averageCost: number;
+  currentPrice: number;
+  marketValue: number;
+  unrealizedPnl: number;
+  unrealizedPnlPercent: number;
+  dayChange: number;
+  dayChangePercent: number;
+}
+
+export interface Quote {
+  symbol: string;
+  name: string;
+  sector: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  previousClose: number;
+}
+
+export interface MarketMovers {
+  gainers: Quote[];
+  losers: Quote[];
+  mostActive: Quote[];
+}
+
+export interface IndexQuote {
+  symbol: string;
+  name: string;
+  value: number;
+  change: number;
+  changePercent: number;
+}
+
+export type OrderSide = (typeof OrderSide)[keyof typeof OrderSide];
+
+export const OrderSide = {
+  buy: "buy",
+  sell: "sell",
+} as const;
+
+export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
+
+export const OrderStatus = {
+  filled: "filled",
+  pending: "pending",
+  rejected: "rejected",
+} as const;
+
+export interface Order {
+  id: number;
+  symbol: string;
+  name: string;
+  side: OrderSide;
+  quantity: number;
+  price: number;
+  total: number;
+  status: OrderStatus;
+  createdAt: string;
+}
+
+export type TransactionType =
+  (typeof TransactionType)[keyof typeof TransactionType];
+
+export const TransactionType = {
+  deposit: "deposit",
+  buy: "buy",
+  sell: "sell",
+  dividend: "dividend",
+  fee: "fee",
+} as const;
+
+export interface Transaction {
+  id: number;
+  type: TransactionType;
+  description: string;
+  amount: number;
+  symbol?: string;
+  createdAt: string;
+}
+
+export interface NewsItem {
+  id: string;
+  headline: string;
+  source: string;
+  category: string;
+  publishedAt: string;
+  symbols: string[];
+  summary: string;
+}
+
+export interface DashboardSummary {
+  account: AccountSnapshot;
+  equityCurve: EquityCurve;
+  positions: Position[];
+  watchlist: Quote[];
+  movers: MarketMovers;
+  indices: IndexQuote[];
+  recentOrders: Order[];
+  recentTransactions: Transaction[];
+  news: NewsItem[];
+}
+
+export interface QuoteDetail {
+  symbol: string;
+  name: string;
+  sector: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  previousClose: number;
+  open: number;
+  dayHigh: number;
+  dayLow: number;
+  yearHigh: number;
+  yearLow: number;
+  marketCap: number;
+  volume: number;
+  peRatio: number;
+  dividendYield: number;
+  description: string;
+}
+
+export interface Candle {
+  t: string;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
+}
+
+export interface SymbolChart {
+  symbol: string;
+  range: string;
+  candles: Candle[];
+}
+
+export interface AllocationSlice {
+  label: string;
+  value: number;
+  percent: number;
+}
+
+export interface Allocation {
+  bySector: AllocationSlice[];
+  byAsset: AllocationSlice[];
+}
+
+export type PlaceOrderBodySide =
+  (typeof PlaceOrderBodySide)[keyof typeof PlaceOrderBodySide];
+
+export const PlaceOrderBodySide = {
+  buy: "buy",
+  sell: "sell",
+} as const;
+
+export interface PlaceOrderBody {
+  symbol: string;
+  side: PlaceOrderBodySide;
+  quantity: number;
+}
+
+export interface AddWatchlistBody {
+  symbol: string;
+}
+
+export interface CreateDepositBody {
+  /** USD deposit amount */
+  amount: number;
+}
+
+export interface CreateDepositResponse {
+  url: string;
+  sessionId: string;
+}
+
+export interface ConfirmDepositBody {
+  sessionId: string;
+}
+
+export interface OpenaiConversation {
+  id: number;
+  title: string;
+  createdAt: string;
+}
+
+export interface OpenaiMessage {
+  id: number;
+  conversationId: number;
+  role: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface CreateOpenaiConversationBody {
+  title: string;
+}
+
+export interface SendOpenaiMessageBody {
+  content: string;
+}
+
+export interface OpenaiConversationWithMessages {
+  id: number;
+  title: string;
+  createdAt: string;
+  messages: OpenaiMessage[];
+}
+
+export interface OpenaiError {
+  error: string;
+}
+
+export type GetAccountPerformanceParams = {
+  range?: GetAccountPerformanceRange;
+};
+
+export type GetAccountPerformanceRange =
+  (typeof GetAccountPerformanceRange)[keyof typeof GetAccountPerformanceRange];
+
+export const GetAccountPerformanceRange = {
+  "1D": "1D",
+  "1W": "1W",
+  "1M": "1M",
+  "3M": "3M",
+  "1Y": "1Y",
+  ALL: "ALL",
+} as const;
+
+export type ListQuotesParams = {
+  /**
+   * Comma-separated symbols (default returns popular set)
+   */
+  symbols?: string;
+};
+
+export type GetSymbolChartParams = {
+  range?: GetSymbolChartRange;
+};
+
+export type GetSymbolChartRange =
+  (typeof GetSymbolChartRange)[keyof typeof GetSymbolChartRange];
+
+export const GetSymbolChartRange = {
+  "1D": "1D",
+  "1W": "1W",
+  "1M": "1M",
+  "3M": "3M",
+  "1Y": "1Y",
+  ALL: "ALL",
+} as const;
