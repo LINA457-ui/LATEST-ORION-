@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/adminApi";
+import { usePageBreadcrumb } from "@/components/layout/AppBreadcrumb";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,10 @@ export default function AdminUserDetailPage() {
     queryFn: () => adminApi.user(userId),
     enabled: !!userId,
   });
+
+  usePageBreadcrumb(
+    (data as { account?: { displayName?: string | null } } | undefined)?.account?.displayName ?? null,
+  );
 
   const [cashInput, setCashInput] = useState("");
   const [cashNote, setCashNote] = useState("");

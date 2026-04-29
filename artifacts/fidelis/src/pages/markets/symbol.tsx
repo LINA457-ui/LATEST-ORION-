@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
+import { usePageBreadcrumb } from "@/components/layout/AppBreadcrumb";
 import { useGetQuote, useGetSymbolChart, useGetWatchlist, useAddToWatchlist, useRemoveFromWatchlist, usePlaceOrder } from "@workspace/api-client-react";
 import { formatCurrency, formatChange, formatCompact, formatNumber, formatPercent } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -20,6 +21,7 @@ export default function SymbolDetailPage() {
   const [, setLocation] = useLocation();
 
   const { data: quote, isLoading: loadingQuote } = useGetQuote(safeSymbol);
+  usePageBreadcrumb(safeSymbol ? safeSymbol.toUpperCase() : null);
   const { data: chart, isLoading: loadingChart } = useGetSymbolChart(safeSymbol, { range });
   const { data: watchlist } = useGetWatchlist();
   

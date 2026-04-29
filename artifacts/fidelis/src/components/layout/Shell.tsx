@@ -12,6 +12,7 @@ import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { useGetMyAccount } from "@workspace/api-client-react";
 import { adminPinSession } from "@/lib/adminApi";
 import { PinGate } from "@/components/admin/PinGate";
+import { AppBreadcrumb, BreadcrumbProvider } from "@/components/layout/AppBreadcrumb";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -52,6 +53,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <BreadcrumbProvider>
     <div className="min-h-screen bg-background flex w-full">
       <PinGate
         open={pinOpen}
@@ -216,9 +218,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-x-hidden p-4 sm:p-6 md:p-8">
+          <AppBreadcrumb />
           {children}
         </main>
       </div>
     </div>
+    </BreadcrumbProvider>
   );
 }
