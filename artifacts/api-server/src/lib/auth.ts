@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import { db, accounts } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { createAccountWithSeed } from "./seedPortfolio";
+import { verifyPinToken } from "./adminPin";
 
 export type AuthedRequest = Request & { userId: string };
 
@@ -125,6 +126,22 @@ export async function requireAdmin(
     .limit(1);
   if (!account?.isAdmin) {
     res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  next();
+}
+
+// Requires a valid admin PIN token (issued by /admin/pin/verify) in addition
+// to the regular admin role check. Sent via X-Admin-Pin request header.
+export function requirePinVerified(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const userId = userIdOf(req);
+  const token = req.header("x-admin-pin");
+  if (!token || !verifyPinToken(token, userId)) {
+    res.status(401).json({ error: "PIN verification required", code: "PIN_REQUIRED" });
     return;
   }
   next();

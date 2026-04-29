@@ -9,9 +9,22 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/format";
-import { ArrowLeft, Trash2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Trash2, AlertCircle, Sparkles, Plus } from "lucide-react";
+
+const TX_TYPES = [
+  "deposit",
+  "withdrawal",
+  "buy",
+  "sell",
+  "dividend",
+  "fee",
+  "interest",
+  "transfer",
+  "adjustment",
+];
 
 export default function AdminUserDetailPage() {
   const params = useParams<{ userId: string }>();
@@ -33,6 +46,20 @@ export default function AdminUserDetailPage() {
   const [holdingCost, setHoldingCost] = useState("");
   const [displayName, setDisplayName] = useState("");
 
+  // Override form state
+  const [ovEquity, setOvEquity] = useState("");
+  const [ovMarket, setOvMarket] = useState("");
+  const [ovBuying, setOvBuying] = useState("");
+  const [ovChange, setOvChange] = useState("");
+  const [ovChangePct, setOvChangePct] = useState("");
+
+  // New transaction form state
+  const [txType, setTxType] = useState("deposit");
+  const [txDesc, setTxDesc] = useState("");
+  const [txAmount, setTxAmount] = useState("");
+  const [txSymbol, setTxSymbol] = useState("");
+  const [txDate, setTxDate] = useState(new Date().toISOString().slice(0, 16));
+
   const setCashMut = useMutation({
     mutationFn: () => adminApi.setCash(userId, Number(cashInput), cashNote),
     onSuccess: (r) => {
@@ -42,6 +69,23 @@ export default function AdminUserDetailPage() {
       refetch();
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
       qc.invalidateQueries({ queryKey: ["admin", "overview"] });
+    },
+    onError: (e: Error) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const overridesMut = useMutation({
+    mutationFn: (
+      body: Parameters<typeof adminApi.setOverrides>[1],
+    ) => adminApi.setOverrides(userId, body),
+    onSuccess: () => {
+      toast({ title: "Display values saved" });
+      setOvEquity("");
+      setOvMarket("");
+      setOvBuying("");
+      setOvChange("");
+      setOvChangePct("");
+      refetch();
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
     },
     onError: (e: Error) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
@@ -75,9 +119,37 @@ export default function AdminUserDetailPage() {
       setDisplayName("");
       refetch();
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
-      // If admin demoted themselves, re-check admin status so AdminRoute
-      // can cleanly redirect them out of the admin section.
       qc.invalidateQueries({ queryKey: ["admin", "check"] });
+    },
+    onError: (e: Error) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const createTxMut = useMutation({
+    mutationFn: () =>
+      adminApi.createTransaction(userId, {
+        type: txType,
+        description: txDesc,
+        amount: Number(txAmount),
+        symbol: txSymbol || null,
+        createdAt: txDate ? new Date(txDate).toISOString() : undefined,
+      }),
+    onSuccess: () => {
+      toast({ title: "Transaction added" });
+      setTxDesc("");
+      setTxAmount("");
+      setTxSymbol("");
+      refetch();
+      qc.invalidateQueries({ queryKey: ["admin", "transactions"] });
+    },
+    onError: (e: Error) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteTxMut = useMutation({
+    mutationFn: (id: number) => adminApi.deleteTransaction(id),
+    onSuccess: () => {
+      toast({ title: "Transaction removed" });
+      refetch();
+      qc.invalidateQueries({ queryKey: ["admin", "transactions"] });
     },
     onError: (e: Error) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
@@ -106,6 +178,44 @@ export default function AdminUserDetailPage() {
   }
 
   const a = data.account;
+  const ov = a.overrides;
+  const initials = (a.displayName?.[0] ?? "U").toUpperCase();
+
+  function parseOptional(v: string): number | null | undefined {
+    if (v.trim() === "") return undefined;
+    if (v.trim().toLowerCase() === "clear" || v.trim().toLowerCase() === "null") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  function applyOverrides() {
+    const body: Parameters<typeof adminApi.setOverrides>[1] = {};
+    const e = parseOptional(ovEquity);
+    const m = parseOptional(ovMarket);
+    const b = parseOptional(ovBuying);
+    const c = parseOptional(ovChange);
+    const p = parseOptional(ovChangePct);
+    if (e !== undefined) body.equity = e;
+    if (m !== undefined) body.marketValue = m;
+    if (b !== undefined) body.buyingPower = b;
+    if (c !== undefined) body.dayChange = c;
+    if (p !== undefined) body.dayChangePercent = p;
+    if (Object.keys(body).length === 0) {
+      toast({ title: "Nothing to save", description: "Enter values or 'clear' to remove an override." });
+      return;
+    }
+    overridesMut.mutate(body);
+  }
+
+  function clearAllOverrides() {
+    overridesMut.mutate({
+      equity: null,
+      marketValue: null,
+      buyingPower: null,
+      dayChange: null,
+      dayChangePercent: null,
+    });
+  }
 
   return (
     <div className="space-y-6 pb-8">
@@ -116,10 +226,18 @@ export default function AdminUserDetailPage() {
       </div>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{a.displayName}</h1>
-          <p className="text-muted-foreground mt-1">{a.email ?? "No email on file"}</p>
-          <p className="text-xs text-muted-foreground font-mono mt-1">{a.userId}</p>
+        <div className="flex items-center gap-4">
+          <Avatar className="w-16 h-16 border">
+            {a.avatarUrl && <AvatarImage src={a.avatarUrl} />}
+            <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{a.displayName}</h1>
+            <p className="text-muted-foreground mt-1">{a.email ?? "No email on file"}</p>
+            <p className="text-xs text-muted-foreground font-mono mt-1">{a.userId}</p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           {a.isAdmin && <Badge>Admin</Badge>}
@@ -128,11 +246,70 @@ export default function AdminUserDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Equity</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(a.totalEquity)}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Cash Balance</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(a.cashBalance)}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Portfolio Value</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(a.portfolioValue)}</div></CardContent></Card>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <DisplayedStat label="Total Equity" value={a.displayedTotalEquity} overridden={ov.equity != null} />
+        <DisplayedStat label="Market Value" value={a.displayedPortfolioValue} overridden={ov.marketValue != null} />
+        <DisplayedStat label="Cash Balance" value={a.cashBalance} />
+        <DisplayedStat label="Buying Power" value={a.displayedBuyingPower} overridden={ov.buyingPower != null} />
       </div>
+
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" /> Display value overrides
+          </CardTitle>
+          <CardDescription>
+            Lock the figures shown on this user's dashboard. Leave a field blank to keep its current setting.
+            Type <span className="font-mono">clear</span> to remove an existing override and revert to live calculations.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <OverrideInput
+              label="Total Equity ($)"
+              value={ovEquity}
+              onChange={setOvEquity}
+              current={ov.equity}
+            />
+            <OverrideInput
+              label="Market Value ($)"
+              value={ovMarket}
+              onChange={setOvMarket}
+              current={ov.marketValue}
+            />
+            <OverrideInput
+              label="Buying Power ($)"
+              value={ovBuying}
+              onChange={setOvBuying}
+              current={ov.buyingPower}
+            />
+            <OverrideInput
+              label="Day Change ($)"
+              value={ovChange}
+              onChange={setOvChange}
+              current={ov.dayChange}
+            />
+            <OverrideInput
+              label="Day Change (%)"
+              value={ovChangePct}
+              onChange={setOvChangePct}
+              current={ov.dayChangePercent}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={applyOverrides} disabled={overridesMut.isPending}>
+              {overridesMut.isPending ? "Saving..." : "Save overrides"}
+            </Button>
+            <Button variant="outline" onClick={clearAllOverrides} disabled={overridesMut.isPending}>
+              Clear all overrides
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            When an override is set, that value persists across deploys and ignores
+            the live market simulator. The cash balance is set in "Adjust Cash Balance" below.
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
@@ -240,9 +417,15 @@ export default function AdminUserDetailPage() {
                       <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(p.currentPrice)}</td>
                       <td className="px-4 py-2 text-right font-semibold tabular-nums">{formatCurrency(p.marketValue)}</td>
                       <td className="px-4 py-2 text-right">
-                        <Button variant="ghost" size="sm" onClick={() => {
-                          if (confirm(`Remove ${p.symbol}?`)) deleteHoldingMut.mutate(p.symbol);
-                        }}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Remove holding ${p.symbol}`}
+                          title={`Remove holding ${p.symbol}`}
+                          onClick={() => {
+                            if (confirm(`Remove ${p.symbol}?`)) deleteHoldingMut.mutate(p.symbol);
+                          }}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </td>
@@ -252,6 +435,81 @@ export default function AdminUserDetailPage() {
               </table>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Add a transaction</CardTitle>
+          <CardDescription>
+            Hand-create historical transactions (deposit, dividend, fee, buy/sell, etc.) with any date you choose.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              createTxMut.mutate();
+            }}
+            className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end"
+          >
+            <div className="md:col-span-2">
+              <Label>Type</Label>
+              <select
+                value={txType}
+                onChange={(e) => setTxType(e.target.value)}
+                className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+              >
+                {TX_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-3">
+              <Label>Date / time</Label>
+              <Input
+                type="datetime-local"
+                value={txDate}
+                onChange={(e) => setTxDate(e.target.value)}
+              />
+            </div>
+            <div className="md:col-span-4">
+              <Label>Description</Label>
+              <Input
+                value={txDesc}
+                onChange={(e) => setTxDesc(e.target.value)}
+                placeholder="e.g. PFE dividend payout"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Amount (USD)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={txAmount}
+                onChange={(e) => setTxAmount(e.target.value)}
+                placeholder="44.74 or -1.05"
+              />
+            </div>
+            <div className="md:col-span-1">
+              <Label>Symbol</Label>
+              <Input
+                value={txSymbol}
+                onChange={(e) => setTxSymbol(e.target.value.toUpperCase())}
+                placeholder="opt"
+                maxLength={10}
+              />
+            </div>
+            <div className="md:col-span-12 flex justify-end">
+              <Button
+                type="submit"
+                disabled={!txDesc.trim() || !txAmount || createTxMut.isPending}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                {createTxMut.isPending ? "Saving..." : "Add transaction"}
+              </Button>
+            </div>
+          </form>
         </CardContent>
       </Card>
 
@@ -281,24 +539,42 @@ export default function AdminUserDetailPage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Recent Transactions</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Recent Transactions ({data.recentTransactions.length})</CardTitle>
+            <CardDescription>Click the trash icon to delete a transaction.</CardDescription>
+          </CardHeader>
           <CardContent className="p-0">
             {data.recentTransactions.length === 0 ? (
               <p className="text-sm text-muted-foreground p-6">No transactions yet.</p>
             ) : (
-              <div className="divide-y">
+              <div className="divide-y max-h-[480px] overflow-y-auto">
                 {data.recentTransactions.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between px-4 py-2 text-sm">
-                    <div>
-                      <Badge variant="outline" className="mr-2">{t.type}</Badge>
-                      {t.description}
+                  <div key={t.id} className="flex items-center justify-between px-4 py-2 text-sm gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline">{t.type}</Badge>
+                        {t.symbol && <span className="font-mono text-xs text-muted-foreground">{t.symbol}</span>}
+                      </div>
+                      <div className="truncate mt-1">{t.description}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(t.createdAt).toLocaleString()}</div>
                     </div>
                     <div className="text-right">
                       <div className={`tabular-nums font-semibold ${t.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
                         {t.amount >= 0 ? "+" : ""}{formatCurrency(t.amount)}
                       </div>
-                      <div className="text-xs text-muted-foreground">{new Date(t.createdAt).toLocaleString()}</div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Delete transaction ${t.id}`}
+                      title="Delete this transaction"
+                      onClick={() => {
+                        if (confirm("Remove this transaction?")) deleteTxMut.mutate(t.id);
+                      }}
+                      disabled={deleteTxMut.isPending}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -315,6 +591,7 @@ export default function AdminUserDetailPage() {
         <CardContent>
           <Button
             variant="destructive"
+            aria-label="Permanently delete user account"
             onClick={() => {
               if (confirm(`PERMANENTLY delete ${a.displayName} (${a.email ?? a.userId}) and all their data? This cannot be undone.`)) {
                 deleteUserMut.mutate();
@@ -327,6 +604,59 @@ export default function AdminUserDetailPage() {
           </Button>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function DisplayedStat({
+  label,
+  value,
+  overridden,
+}: {
+  label: string;
+  value: number;
+  overridden?: boolean;
+}) {
+  return (
+    <Card className={overridden ? "border-primary/40" : ""}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm text-muted-foreground flex items-center justify-between">
+          <span>{label}</span>
+          {overridden && (
+            <Badge variant="outline" className="text-[10px] border-primary/50 text-primary">
+              OVERRIDE
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{formatCurrency(value)}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function OverrideInput({
+  label,
+  value,
+  onChange,
+  current,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  current: number | null;
+}) {
+  return (
+    <div>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={
+          current !== null ? `current: ${current}` : "(live)"
+        }
+      />
     </div>
   );
 }

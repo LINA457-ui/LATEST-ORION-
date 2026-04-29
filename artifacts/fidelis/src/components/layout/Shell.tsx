@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { UserButton } from "@clerk/react";
+import { UserButton, useUser } from "@clerk/react";
 import { useTheme } from "@/components/layout/ThemeProvider";
 import { Logo } from "@/components/layout/Logo";
 import { Search, Menu, LayoutDashboard, Briefcase, LineChart, ArrowLeftRight, Star, History, BrainCircuit, Wallet, User as UserIcon, Moon, Sun, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { useGetMyAccount } from "@workspace/api-client-react";
+import { adminPinSession } from "@/lib/adminApi";
+import { PinGate } from "@/components/admin/PinGate";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -21,14 +25,39 @@ const NAV_ITEMS = [
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const { data: adminCheck } = useAdminCheck();
+  const { user } = useUser();
+  const { data: myAccount } = useGetMyAccount();
   const isAdmin = !!adminCheck?.isAdmin;
+
+  const customAvatar = (myAccount as { avatarUrl?: string | null } | undefined)
+    ?.avatarUrl;
+  const avatarSrc = customAvatar || user?.imageUrl;
+  const initials =
+    (user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? "") ||
+    (user?.primaryEmailAddress?.emailAddress?.[0] ?? "U");
+
+  function handleAdminClick(e: React.MouseEvent) {
+    e.preventDefault();
+    setIsMobileOpen(false);
+    if (adminPinSession.get()) {
+      navigate("/admin");
+    } else {
+      setPinOpen(true);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background flex w-full">
+      <PinGate
+        open={pinOpen}
+        onOpenChange={setPinOpen}
+        onSuccess={() => navigate("/admin")}
+      />
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r bg-card/50 backdrop-blur-sm sticky top-0 h-screen shrink-0">
         <div className="h-16 flex items-center px-6 border-b">
@@ -55,9 +84,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="p-4 border-t space-y-1">
           {isAdmin && (
-            <Link
+            <a
               href="/admin"
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              onClick={handleAdminClick}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
                 location.startsWith("/admin")
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -65,7 +95,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             >
               <Shield className="w-4 h-4" />
               Admin
-            </Link>
+            </a>
           )}
           <Link
             href="/profile"
@@ -117,10 +147,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   })}
                   <div className="my-2 border-t pt-2" />
                   {isAdmin && (
-                    <Link
+                    <a
                       href="/admin"
-                      onClick={() => setIsMobileOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      onClick={handleAdminClick}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
                         location.startsWith("/admin")
                           ? "bg-primary/10 text-primary"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -128,7 +158,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                     >
                       <Shield className="w-4 h-4" />
                       Admin
-                    </Link>
+                    </a>
                   )}
                   <Link
                     href="/profile"
@@ -164,7 +194,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           
-          <div className="flex items-center gap-4 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             <Button 
               variant="ghost" 
               size="icon" 
@@ -172,6 +202,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
             >
               {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </Button>
+            <Link href="/profile" className="hidden sm:block" aria-label="Profile">
+              <Avatar className="w-9 h-9 border hover:ring-2 hover:ring-primary/40 transition">
+                {avatarSrc && <AvatarImage src={avatarSrc} alt={user?.fullName ?? "Profile"} />}
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                  {initials.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
             <UserButton />
           </div>
         </header>

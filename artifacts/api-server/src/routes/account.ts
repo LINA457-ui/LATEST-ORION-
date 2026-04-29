@@ -40,19 +40,46 @@ async function getAccountSnapshot(userId: string) {
     dayChange += qty * q.change;
   }
   const cashBalance = Number(account.cashBalance);
-  const totalEquity = +(portfolioValue + cashBalance).toFixed(2);
-  const previousValue = totalEquity - dayChange;
-  const dayChangePercent =
-    previousValue > 0 ? +((dayChange / previousValue) * 100).toFixed(2) : 0;
+  const computedPortfolioValue = +portfolioValue.toFixed(2);
+  const computedTotalEquity = +(portfolioValue + cashBalance).toFixed(2);
+  const computedDayChange = +dayChange.toFixed(2);
+  const previousValue = computedTotalEquity - computedDayChange;
+  const computedDayChangePercent =
+    previousValue > 0 ? +((computedDayChange / previousValue) * 100).toFixed(2) : 0;
+
+  // Admin-set display overrides (when present) take precedence over computed
+  // figures so the dashboard stays stable regardless of market simulator state.
+  const portfolioValueDisplay =
+    account.marketValueOverride != null
+      ? Number(account.marketValueOverride)
+      : computedPortfolioValue;
+  const totalEquityDisplay =
+    account.equityOverride != null
+      ? Number(account.equityOverride)
+      : computedTotalEquity;
+  const buyingPowerDisplay =
+    account.buyingPowerOverride != null
+      ? Number(account.buyingPowerOverride)
+      : cashBalance;
+  const dayChangeDisplay =
+    account.dayChangeOverride != null
+      ? Number(account.dayChangeOverride)
+      : computedDayChange;
+  const dayChangePercentDisplay =
+    account.dayChangePercentOverride != null
+      ? Number(account.dayChangePercentOverride)
+      : computedDayChangePercent;
+
   return {
     userId,
     displayName: account.displayName,
+    avatarUrl: account.avatarUrl ?? null,
     cashBalance,
-    totalEquity,
-    portfolioValue: +portfolioValue.toFixed(2),
-    dayChange: +dayChange.toFixed(2),
-    dayChangePercent,
-    buyingPower: cashBalance,
+    totalEquity: totalEquityDisplay,
+    portfolioValue: portfolioValueDisplay,
+    dayChange: dayChangeDisplay,
+    dayChangePercent: dayChangePercentDisplay,
+    buyingPower: buyingPowerDisplay,
   };
 }
 
@@ -70,6 +97,46 @@ router.post("/sync", async (req, res: Response) => {
   };
   await ensureAccount(userId, displayName, email);
   res.json({ ok: true });
+});
+
+// Upload (or clear) the user's avatar. The client should resize/compress to
+// a small JPEG and send a data URL — we cap the payload at ~600KB so bulk
+// uploads cannot bloat the database.
+router.post("/avatar", async (req, res: Response) => {
+  const userId = userIdOf(req);
+  const { avatarUrl } = (req.body ?? {}) as { avatarUrl?: string | null };
+  if (avatarUrl === null || avatarUrl === "") {
+    await db
+      .update(accounts)
+      .set({ avatarUrl: null })
+      .where(eq(accounts.userId, userId));
+    res.json({ ok: true, avatarUrl: null });
+    return;
+  }
+  if (typeof avatarUrl !== "string") {
+    res.status(400).json({ error: "avatarUrl must be a string or null" });
+    return;
+  }
+  // Restrict to base64-encoded JPEG / PNG / WEBP data URLs. Reject any other
+  // schemes (incl. http(s), javascript:, data:text/html, etc.) so we don't
+  // store anything that the browser might render unexpectedly.
+  const dataUrlRe = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+  if (!dataUrlRe.test(avatarUrl)) {
+    res.status(400).json({
+      error: "Avatar must be a base64-encoded JPEG, PNG, or WEBP data URL.",
+    });
+    return;
+  }
+  if (avatarUrl.length > 600_000) {
+    res.status(413).json({ error: "Image too large. Please upload a smaller picture." });
+    return;
+  }
+  await ensureAccount(userId);
+  await db
+    .update(accounts)
+    .set({ avatarUrl })
+    .where(eq(accounts.userId, userId));
+  res.json({ ok: true, avatarUrl });
 });
 
 router.get("/performance", async (req, res: Response) => {

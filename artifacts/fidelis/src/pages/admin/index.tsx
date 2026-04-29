@@ -4,7 +4,7 @@ import { adminApi } from "@/lib/adminApi";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/format";
-import { Users, DollarSign, BarChart3, Activity, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Users, DollarSign, BarChart3, Activity, ShieldAlert, ShieldCheck, KeyRound } from "lucide-react";
 
 export default function AdminOverviewPage() {
   const { data, isLoading, isError } = useQuery({
@@ -98,6 +98,10 @@ export default function AdminOverviewPage() {
             <Link href="/admin/transactions" className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted">
               <div className="flex items-center gap-3"><BarChart3 className="w-4 h-4" /><span>All Transactions</span></div>
               <span className="text-xs text-muted-foreground">{formatCurrency(data.totalVolume)}</span>
+            </Link>
+            <Link href="/admin/pins" className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted">
+              <div className="flex items-center gap-3"><KeyRound className="w-4 h-4" /><span>Admin PINs</span></div>
+              <span className="text-xs text-muted-foreground">Manage</span>
             </Link>
           </CardContent>
         </Card>

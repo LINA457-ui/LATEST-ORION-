@@ -5,3 +5,4 @@ export * from "./holdings";
 export * from "./orders";
 export * from "./watchlist";
 export * from "./transactions";
+export * from "./adminPins";

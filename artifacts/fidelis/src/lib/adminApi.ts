@@ -1,4 +1,36 @@
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const PIN_TOKEN_KEY = "orion_admin_pin_token";
+
+export const adminPinSession = {
+  get(): string | null {
+    try {
+      return sessionStorage.getItem(PIN_TOKEN_KEY);
+    } catch {
+      return null;
+    }
+  },
+  set(token: string) {
+    try {
+      sessionStorage.setItem(PIN_TOKEN_KEY, token);
+    } catch {
+      /* ignore */
+    }
+  },
+  clear() {
+    try {
+      sessionStorage.removeItem(PIN_TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
+  },
+};
+
+export class PinRequiredError extends Error {
+  constructor() {
+    super("PIN_REQUIRED");
+    this.name = "PinRequiredError";
+  }
+}
 
 async function getToken(): Promise<string | null> {
   // @ts-ignore
@@ -6,24 +38,72 @@ async function getToken(): Promise<string | null> {
   return t ?? null;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+interface RequestOpts extends RequestInit {
+  withPin?: boolean;
+}
+
+async function request<T>(path: string, init?: RequestOpts): Promise<T> {
   const token = await getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((init?.headers as Record<string, string>) ?? {}),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (init?.withPin !== false) {
+    const pinToken = adminPinSession.get();
+    if (pinToken) headers["X-Admin-Pin"] = pinToken;
+  }
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
+  if (res.status === 401) {
+    // Try to detect PIN failure vs auth failure.
+    let body: { code?: string } = {};
+    try {
+      body = await res.clone().json();
+    } catch {
+      /* ignore */
+    }
+    if (body.code === "PIN_REQUIRED") {
+      adminPinSession.clear();
+      throw new PinRequiredError();
+    }
+  }
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`${res.status} ${res.statusText} ${text}`);
+    let message = `${res.status} ${res.statusText}`;
+    try {
+      const body = await res.clone().json();
+      if (body?.error) message = String(body.error);
+    } catch {
+      const text = await res.text().catch(() => "");
+      if (text) message = text;
+    }
+    throw new Error(message);
   }
   if (res.status === 204) return undefined as unknown as T;
   return (await res.json()) as T;
 }
 
 export const adminApi = {
-  check: () => request<{ isAdmin: boolean }>("/api/admin/check"),
+  check: () => request<{ isAdmin: boolean }>("/api/admin/check", { withPin: false }),
+  verifyPin: (pin: string) =>
+    request<{ ok: true; token: string }>("/api/admin/pin/verify", {
+      method: "POST",
+      body: JSON.stringify({ pin }),
+      withPin: false,
+    }),
+  listPins: () => request<AdminPinRow[]>("/api/admin/pins"),
+  createPin: (pin: string, label?: string) =>
+    request<{ ok: true; id: number }>("/api/admin/pins", {
+      method: "POST",
+      body: JSON.stringify({ pin, label }),
+    }),
+  updatePin: (id: number, body: { pin?: string; label?: string }) =>
+    request<{ ok: true }>(`/api/admin/pins/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deletePin: (id: number) =>
+    request<{ ok: true }>(`/api/admin/pins/${id}`, { method: "DELETE" }),
+
   overview: () => request<AdminOverview>("/api/admin/overview"),
   users: () => request<AdminUserSummary[]>("/api/admin/users"),
   user: (userId: string) =>
@@ -38,6 +118,20 @@ export const adminApi = {
       `/api/admin/users/${encodeURIComponent(userId)}/cash`,
       { method: "PATCH", body: JSON.stringify({ cashBalance, note }) },
     ),
+  setOverrides: (
+    userId: string,
+    body: Partial<{
+      equity: number | null;
+      marketValue: number | null;
+      buyingPower: number | null;
+      dayChange: number | null;
+      dayChangePercent: number | null;
+    }>,
+  ) =>
+    request<{ ok: true }>(`/api/admin/users/${encodeURIComponent(userId)}/overrides`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   upsertHolding: (userId: string, body: { symbol: string; quantity: number; averageCost: number }) =>
     request<{ ok: true }>(`/api/admin/users/${encodeURIComponent(userId)}/holdings`, {
       method: "POST",
@@ -48,6 +142,36 @@ export const adminApi = {
       `/api/admin/users/${encodeURIComponent(userId)}/holdings/${encodeURIComponent(symbol)}`,
       { method: "DELETE" },
     ),
+  createTransaction: (
+    userId: string,
+    body: {
+      type: string;
+      description: string;
+      amount: number;
+      symbol?: string | null;
+      createdAt?: string;
+    },
+  ) =>
+    request<{ ok: true; transaction: AdminUserDetail["recentTransactions"][number] }>(
+      `/api/admin/users/${encodeURIComponent(userId)}/transactions`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  updateTransaction: (
+    id: number,
+    body: Partial<{
+      type: string;
+      description: string;
+      amount: number;
+      symbol: string | null;
+      createdAt: string;
+    }>,
+  ) =>
+    request<{ ok: true }>(`/api/admin/transactions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteTransaction: (id: number) =>
+    request<{ ok: true }>(`/api/admin/transactions/${id}`, { method: "DELETE" }),
   deleteUser: (userId: string) =>
     request<{ ok: true }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
       method: "DELETE",
@@ -58,6 +182,13 @@ export const adminApi = {
     request<{ ok: true }>(`/api/account/sync`, {
       method: "POST",
       body: JSON.stringify(body),
+      withPin: false,
+    }),
+  uploadAvatar: (avatarUrl: string | null) =>
+    request<{ ok: true; avatarUrl: string | null }>(`/api/account/avatar`, {
+      method: "POST",
+      body: JSON.stringify({ avatarUrl }),
+      withPin: false,
     }),
 };
 
@@ -75,16 +206,25 @@ export interface AdminOverview {
   topHoldings: { symbol: string; name: string; totalValue: number }[];
 }
 
+export interface AdminPinRow {
+  id: number;
+  label: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
 export interface AdminUserSummary {
   userId: string;
   displayName: string;
   email: string | null;
+  avatarUrl: string | null;
   cashBalance: number;
   portfolioValue: number;
   totalEquity: number;
   positionCount: number;
   isAdmin: boolean;
   isSuspended: boolean;
+  hasOverrides: boolean;
   createdAt: string;
 }
 
@@ -93,12 +233,25 @@ export interface AdminUserDetail {
     userId: string;
     displayName: string;
     email: string | null;
+    avatarUrl: string | null;
     cashBalance: number;
     portfolioValue: number;
     totalEquity: number;
     isAdmin: boolean;
     isSuspended: boolean;
     createdAt: string;
+    displayedTotalEquity: number;
+    displayedPortfolioValue: number;
+    displayedBuyingPower: number;
+    displayedDayChange: number | null;
+    displayedDayChangePercent: number | null;
+    overrides: {
+      equity: number | null;
+      marketValue: number | null;
+      buyingPower: number | null;
+      dayChange: number | null;
+      dayChangePercent: number | null;
+    };
   };
   positions: {
     id: number;

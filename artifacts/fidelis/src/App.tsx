@@ -30,6 +30,7 @@ import AdminUsers from "@/pages/admin/users";
 import AdminUserDetail from "@/pages/admin/user-detail";
 import AdminOrders from "@/pages/admin/orders";
 import AdminTransactions from "@/pages/admin/transactions";
+import AdminPins from "@/pages/admin/pins";
 
 function ProfileSyncer() {
   useSyncProfile();
@@ -60,6 +61,7 @@ function Router() {
       <Route path="/admin/users/:userId"><AdminRoute><Shell><AdminUserDetail /></Shell></AdminRoute></Route>
       <Route path="/admin/orders"><AdminRoute><Shell><AdminOrders /></Shell></AdminRoute></Route>
       <Route path="/admin/transactions"><AdminRoute><Shell><AdminTransactions /></Shell></AdminRoute></Route>
+      <Route path="/admin/pins"><AdminRoute><Shell><AdminPins /></Shell></AdminRoute></Route>
       
       <Route component={NotFound} />
     </Switch>

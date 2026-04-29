@@ -48,11 +48,22 @@ A Fidelity-style investment banking website at root path `/` with:
 ### Admin section
 Full admin tooling at `/admin/*` (web) and `/api/admin/*` (server). Sidebar shows an "Admin" link conditionally via `useAdminCheck()`.
 
-- DB: `accounts` schema has `email`, `is_admin`, `is_suspended` columns.
-- Backend (`artifacts/api-server/src/routes/admin.ts`, gated by `requireAdmin`): overview stats, list users, user detail (with current positions/orders/transactions), PATCH user (display name / email / isAdmin / isSuspended — refuses to demote the last admin), PATCH cash (atomic `db.transaction` writing both the new balance AND an audit row in `transactions`), POST/DELETE holding (atomic `onConflictDoUpdate` upsert keyed on the unique `(user_id, symbol)` index), DELETE user (atomic transactional cascade — refuses to delete the last admin), system-wide orders and transactions log (joined via Drizzle `inArray`).
-- Frontend (`artifacts/fidelis/src/pages/admin/*`): overview, users list, user detail (cash + holdings + role + suspend + danger-zone delete), system orders log, system transactions log. Uses a small fetch helper at `src/lib/adminApi.ts` with the Clerk session token (no openapi codegen for admin to keep iteration fast).
+- DB schemas:
+  - `accounts`: `email`, `avatar_url`, `is_admin`, `is_suspended`, plus admin-controlled display overrides: `equity_override`, `market_value_override`, `buying_power_override`, `day_change_override`, `day_change_percent_override` (all numeric, nullable). When non-null, these are returned in the account snapshot so dashboards stay stable across deploys/market-simulator restarts.
+  - `admin_pins`: `id`, `pin_hash` (SHA-256 of `${SESSION_SECRET}:${pin}`, with a unique index), `label`, `created_by`, `created_at`. Max 3 PINs (`MAX_PINS` in `src/lib/adminPin.ts`); default `1805` is seeded at server boot via `ensureDefaultPin()`.
+- PIN security (`src/lib/adminPin.ts`):
+  - `SESSION_SECRET` is REQUIRED at server import (>= 16 chars) — the server fails fast if missing because the secret is the HMAC key for PIN tokens.
+  - `POST /api/admin/pin/verify` accepts a PIN and returns a 4-hour HMAC-signed token (`exp.sig`). Token is stored client-side in `sessionStorage["orion_admin_pin_token"]` and sent as `X-Admin-Pin` header on subsequent admin requests.
+  - `requirePinVerified` middleware (in `src/lib/auth.ts`) gates ALL admin data endpoints AND PIN management endpoints (so a forgotten PIN actually requires recovery, not just a logout).
+- Backend (`src/routes/admin.ts`, behind `requireAuth` + `requireAdmin` + `requirePinVerified`): overview stats, list/detail users (incl. avatarUrl + override values), PATCH user (display name / email / role / suspended; refuses to demote the last admin), PATCH cash (atomic transaction with audit row), PATCH overrides (set/clear any combination of the 5 display overrides), POST/DELETE holding (atomic upsert), DELETE user (atomic cascade; refuses to delete the last admin), POST custom transactions (with arbitrary `createdAt`/type/desc/amount/symbol), PATCH/DELETE transactions, full PIN CRUD with atomic `MAX_PINS` enforcement and DB unique-index uniqueness.
+- Avatar upload: `POST /api/account/avatar` accepts `{avatarUrl: string|null}` — accepted format is strict `data:image/(jpeg|png|webp);base64,...` only (no http/https/javascript) and capped at 600KB. Client resizes to 256×256 JPEG via `src/lib/avatarUtils.ts` before upload.
+- Frontend (`artifacts/fidelis/src/pages/admin/*`):
+  - Pages: overview, users list, user detail (overrides editor + cash + holdings + custom transaction editor + delete-tx + role/suspend + danger-zone delete), system orders, system transactions, **`pins`** (PIN CRUD).
+  - `PinGate` modal (`src/components/admin/PinGate.tsx`) intercepts the Admin sidebar link and the `AdminRoute` wrapper. Uses sessionStorage helper `adminPinSession` exported from `src/lib/adminApi.ts`.
+  - `adminApi` fetch helper sends Bearer token (Clerk) + `X-Admin-Pin` header. Pass `{withPin:false}` for endpoints that should NOT include the PIN token (`/admin/check`, `/admin/pin/verify`, `/account/sync`, `/account/avatar`). On 401 with `code: "PIN_REQUIRED"` it clears the token and throws `PinRequiredError`.
+  - Trash icon buttons across the user-detail page have unique `aria-label`s (`Remove holding <SYM>`, `Delete transaction <id>`, `Permanently delete user account`) so they're unambiguous.
 - `useSyncProfile` in `App.tsx` POSTs the signed-in user's Clerk email + full name to `/api/account/sync` once per session, then invalidates the admin-check query so first-user promotion is visible immediately.
-- `AdminRoute` wraps admin pages → redirects non-admins to `/dashboard`. `useAdminCheck` is cache-keyed by Clerk `user.id` to avoid stale state across account switches.
+- `AdminRoute` wraps admin pages → redirects non-admins to `/dashboard` and shows the PIN gate if a token isn't present in sessionStorage. `useAdminCheck` is cache-keyed by Clerk `user.id`.
 
 ## Important Notes
 

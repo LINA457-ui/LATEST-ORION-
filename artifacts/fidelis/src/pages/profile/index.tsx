@@ -1,13 +1,54 @@
+import { useRef, useState } from "react";
 import { useUser } from "@clerk/react";
 import { useGetMyAccount } from "@workspace/api-client-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Camera, Trash2, Upload } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { adminApi } from "@/lib/adminApi";
+import { resizeAvatar } from "@/lib/avatarUtils";
 
 export default function ProfilePage() {
   const { user } = useUser();
   const { data: account } = useGetMyAccount();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const customAvatar = (account as { avatarUrl?: string | null } | undefined)
+    ?.avatarUrl;
+  const avatarSrc = customAvatar || user?.imageUrl;
+
+  const uploadMut = useMutation({
+    mutationFn: async (file: File) => {
+      const dataUrl = await resizeAvatar(file);
+      return adminApi.uploadAvatar(dataUrl);
+    },
+    onSuccess: () => {
+      toast({ title: "Profile picture updated" });
+      qc.invalidateQueries({ queryKey: ["/api/account/me"] });
+      qc.invalidateQueries({ queryKey: ["/api/account/dashboard"] });
+    },
+    onError: (e: Error) =>
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
+    onSettled: () => setBusy(false),
+  });
+
+  const removeMut = useMutation({
+    mutationFn: () => adminApi.uploadAvatar(null),
+    onSuccess: () => {
+      toast({ title: "Profile picture removed" });
+      qc.invalidateQueries({ queryKey: ["/api/account/me"] });
+      qc.invalidateQueries({ queryKey: ["/api/account/dashboard"] });
+    },
+    onError: (e: Error) =>
+      toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
 
   if (!user) return null;
 
@@ -20,15 +61,64 @@ export default function ProfilePage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center gap-4 pb-6">
-          <Avatar className="w-20 h-20">
-            <AvatarImage src={user.imageUrl} />
-            <AvatarFallback className="text-2xl font-bold bg-primary text-primary-foreground">
-              {user.firstName?.[0]}{user.lastName?.[0]}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <CardTitle className="text-2xl">{user.fullName}</CardTitle>
-            <CardDescription className="text-base">{user.primaryEmailAddress?.emailAddress}</CardDescription>
+          <div className="relative">
+            <Avatar className="w-20 h-20">
+              {avatarSrc && <AvatarImage src={avatarSrc} />}
+              <AvatarFallback className="text-2xl font-bold bg-primary text-primary-foreground">
+                {user.firstName?.[0]}
+                {user.lastName?.[0]}
+              </AvatarFallback>
+            </Avatar>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow border-2 border-background hover:scale-105 transition disabled:opacity-50"
+              aria-label="Change profile picture"
+              disabled={busy || uploadMut.isPending}
+            >
+              <Camera className="w-3.5 h-3.5" />
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) {
+                  setBusy(true);
+                  uploadMut.mutate(f);
+                }
+              }}
+            />
+          </div>
+          <div className="min-w-0">
+            <CardTitle className="text-2xl truncate">{user.fullName}</CardTitle>
+            <CardDescription className="text-base truncate">
+              {user.primaryEmailAddress?.emailAddress}
+            </CardDescription>
+            <div className="flex gap-2 mt-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fileRef.current?.click()}
+                disabled={busy || uploadMut.isPending}
+              >
+                <Upload className="w-3.5 h-3.5 mr-1.5" />
+                {uploadMut.isPending ? "Uploading..." : "Upload picture"}
+              </Button>
+              {customAvatar && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => removeMut.mutate()}
+                  disabled={removeMut.isPending}
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Remove
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
