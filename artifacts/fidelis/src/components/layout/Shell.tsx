@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { UserButton, useUser } from "@clerk/react";
+import { UserButton } from "@clerk/react";
 import { useTheme } from "@/components/layout/ThemeProvider";
 import { Logo } from "@/components/layout/Logo";
-import { Search, Menu, LayoutDashboard, Briefcase, LineChart, ArrowLeftRight, Star, History, BrainCircuit, Wallet, User as UserIcon, Moon, Sun } from "lucide-react";
+import { Search, Menu, LayoutDashboard, Briefcase, LineChart, ArrowLeftRight, Star, History, BrainCircuit, Wallet, User as UserIcon, Moon, Sun, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -23,6 +24,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { data: adminCheck } = useAdminCheck();
+  const isAdmin = !!adminCheck?.isAdmin;
 
   return (
     <div className="min-h-screen bg-background flex w-full">
@@ -50,7 +53,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="p-4 border-t">
+        <div className="p-4 border-t space-y-1">
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                location.startsWith("/admin")
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+              Admin
+            </Link>
+          )}
           <Link
             href="/profile"
             className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -100,6 +116,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
                     );
                   })}
                   <div className="my-2 border-t pt-2" />
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setIsMobileOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        location.startsWith("/admin")
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      <Shield className="w-4 h-4" />
+                      Admin
+                    </Link>
+                  )}
                   <Link
                     href="/profile"
                     onClick={() => setIsMobileOpen(false)}

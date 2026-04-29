@@ -62,6 +62,16 @@ router.get("/me", async (req, res: Response) => {
   res.json(snapshot);
 });
 
+router.post("/sync", async (req, res: Response) => {
+  const userId = userIdOf(req);
+  const { email, displayName } = (req.body ?? {}) as {
+    email?: string;
+    displayName?: string;
+  };
+  await ensureAccount(userId, displayName, email);
+  res.json({ ok: true });
+});
+
 router.get("/performance", async (req, res: Response) => {
   const userId = userIdOf(req);
   const parsed = GetAccountPerformanceQueryParams.parse(req.query);

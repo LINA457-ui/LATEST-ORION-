@@ -7,7 +7,9 @@ import NotFound from "@/pages/not-found";
 
 import { Shell } from "@/components/layout/Shell";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
+import { AdminRoute } from "@/components/layout/AdminRoute";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
+import { useSyncProfile } from "@/hooks/useSyncProfile";
 
 import Marketing from "@/pages/marketing";
 import SignIn from "@/pages/auth/sign-in";
@@ -23,6 +25,16 @@ import Advisor from "@/pages/advisor";
 import Funding from "@/pages/funding";
 import FundingSuccess from "@/pages/funding/success";
 import Profile from "@/pages/profile";
+import AdminOverview from "@/pages/admin";
+import AdminUsers from "@/pages/admin/users";
+import AdminUserDetail from "@/pages/admin/user-detail";
+import AdminOrders from "@/pages/admin/orders";
+import AdminTransactions from "@/pages/admin/transactions";
+
+function ProfileSyncer() {
+  useSyncProfile();
+  return null;
+}
 
 function Router() {
   return (
@@ -42,6 +54,12 @@ function Router() {
       <Route path="/funding"><ProtectedRoute><Shell><Funding /></Shell></ProtectedRoute></Route>
       <Route path="/funding/success"><ProtectedRoute><Shell><FundingSuccess /></Shell></ProtectedRoute></Route>
       <Route path="/profile"><ProtectedRoute><Shell><Profile /></Shell></ProtectedRoute></Route>
+
+      <Route path="/admin"><AdminRoute><Shell><AdminOverview /></Shell></AdminRoute></Route>
+      <Route path="/admin/users"><AdminRoute><Shell><AdminUsers /></Shell></AdminRoute></Route>
+      <Route path="/admin/users/:userId"><AdminRoute><Shell><AdminUserDetail /></Shell></AdminRoute></Route>
+      <Route path="/admin/orders"><AdminRoute><Shell><AdminOrders /></Shell></AdminRoute></Route>
+      <Route path="/admin/transactions"><AdminRoute><Shell><AdminTransactions /></Shell></AdminRoute></Route>
       
       <Route component={NotFound} />
     </Switch>
@@ -54,6 +72,7 @@ function App() {
       <ThemeProvider>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <ProfileSyncer />
             <Router />
           </WouterRouter>
           <Toaster />

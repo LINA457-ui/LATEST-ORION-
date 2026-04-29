@@ -50,6 +50,10 @@ router.post("/orders", async (req, res: Response) => {
     return;
   }
   const account = await ensureAccount(userId);
+  if (account?.isSuspended) {
+    res.status(403).json({ error: "Account suspended. Trading disabled." });
+    return;
+  }
   const price = quote.price;
   const total = +(price * body.quantity).toFixed(2);
 

@@ -41,9 +41,18 @@ A Fidelity-style investment banking website at root path `/` with:
 
 ### API Server (`artifacts/api-server`)
 - Express 5 + Drizzle, mounted at `/api` via Replit proxy.
-- Auth: Clerk middleware. `requireAuth` + `ensureAccount` ($100k cash for new users) in `src/lib/auth.ts`.
+- Auth: Clerk middleware. `requireAuth` + `ensureAccount` ($100k cash for new users) in `src/lib/auth.ts`. The very first account created in the DB is auto-promoted to admin.
 - Simulated market data (20-symbol universe) in `src/lib/marketData.ts`.
-- Routes: `account`, `market`, `portfolio`, `trading`, `payments`, `openai` (with SSE).
+- Routes: `account` (incl. `POST /account/sync` to push Clerk email/name into the DB), `market`, `portfolio`, `trading` (blocks suspended accounts with HTTP 403), `payments`, `openai` (with SSE), `admin`.
+
+### Admin section
+Full admin tooling at `/admin/*` (web) and `/api/admin/*` (server). Sidebar shows an "Admin" link conditionally via `useAdminCheck()`.
+
+- DB: `accounts` schema has `email`, `is_admin`, `is_suspended` columns.
+- Backend (`artifacts/api-server/src/routes/admin.ts`, gated by `requireAdmin`): overview stats, list users, user detail (with current positions/orders/transactions), PATCH user (display name / email / isAdmin / isSuspended — refuses to demote the last admin), PATCH cash (atomic `db.transaction` writing both the new balance AND an audit row in `transactions`), POST/DELETE holding (atomic `onConflictDoUpdate` upsert keyed on the unique `(user_id, symbol)` index), DELETE user (atomic transactional cascade — refuses to delete the last admin), system-wide orders and transactions log (joined via Drizzle `inArray`).
+- Frontend (`artifacts/fidelis/src/pages/admin/*`): overview, users list, user detail (cash + holdings + role + suspend + danger-zone delete), system orders log, system transactions log. Uses a small fetch helper at `src/lib/adminApi.ts` with the Clerk session token (no openapi codegen for admin to keep iteration fast).
+- `useSyncProfile` in `App.tsx` POSTs the signed-in user's Clerk email + full name to `/api/account/sync` once per session, then invalidates the admin-check query so first-user promotion is visible immediately.
+- `AdminRoute` wraps admin pages → redirects non-admins to `/dashboard`. `useAdminCheck` is cache-keyed by Clerk `user.id` to avoid stale state across account switches.
 
 ## Important Notes
 
