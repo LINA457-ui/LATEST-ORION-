@@ -12,6 +12,7 @@
     "composite": false,
     "incremental": false,
     "noEmit": false,
+    "noEmitOnError": false,
 
     "skipLibCheck": true
   },
