@@ -54,7 +54,6 @@ async function getAccountSnapshot(userId: string) {
   const computedPortfolioValue = Number(portfolioValue.toFixed(2));
   const computedTotalEquity = Number((portfolioValue + cashBalance).toFixed(2));
   const computedDayChange = Number(dayChange.toFixed(2));
-
   const previousValue = computedTotalEquity - computedDayChange;
 
   const computedDayChangePercent =
@@ -91,20 +90,17 @@ async function getAccountSnapshot(userId: string) {
     userId,
     displayName: account.displayName,
     avatarUrl: account.avatarUrl ?? null,
-
     cashBalance,
     totalEquity: totalEquityDisplay,
     portfolioValue: portfolioValueDisplay,
     dayChange: dayChangeDisplay,
     dayChangePercent: dayChangePercentDisplay,
     buyingPower: buyingPowerDisplay,
-
     displayedTotalEquity: totalEquityDisplay,
     displayedPortfolioValue: portfolioValueDisplay,
     displayedBuyingPower: buyingPowerDisplay,
     displayedDayChange: dayChangeDisplay,
     displayedDayChangePercent: dayChangePercentDisplay,
-
     overrides: {
       equity:
         account.equityOverride != null ? Number(account.equityOverride) : null,
@@ -249,12 +245,11 @@ router.get("/transactions", async (req: Request, res: Response) => {
 router.post("/transactions", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
 
-  const { type, description, amount, symbol, createdAt } = (req.body ?? {}) as {
+  const { type, description, amount, symbol } = (req.body ?? {}) as {
     type?: string;
     description?: string;
     amount?: number | string;
     symbol?: string | null;
-    createdAt?: string;
   };
 
   if (!type || typeof type !== "string") {
@@ -270,22 +265,21 @@ router.post("/transactions", async (req: Request, res: Response) => {
   const numericAmount = Number(amount);
 
   if (!Number.isFinite(numericAmount)) {
-    res.status(400).json({ error: "Transaction amount must be a valid number." });
+    res.status(400).json({
+      error: "Transaction amount must be a valid number.",
+    });
     return;
   }
 
-  const inserted = await db
-    .insert(transactions)
-    .values({
-      userId,
-      type: type.trim(),
-      description: description.trim(),
-      amount: numericAmount.toString(),
-      symbol: symbol ? symbol.toUpperCase().trim() : null,
-      createdAt: createdAt ? new Date(createdAt) : new Date(),
-    })
-    .returning();
+  const values: typeof transactions.$inferInsert = {
+    userId,
+    type: type.trim(),
+    description: description.trim(),
+    amount: String(numericAmount),
+    symbol: symbol ? symbol.toUpperCase().trim() : null,
+  };
 
+  const inserted = await db.insert(transactions).values(values).returning();
   const tx = inserted[0];
 
   res.status(201).json({
@@ -358,7 +352,6 @@ router.get("/dashboard", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
 
   const snapshot = await getAccountSnapshot(userId);
-
   const curve = getEquityCurve(snapshot.totalEquity, "1M");
 
   const change = Number((curve.endValue - curve.startValue).toFixed(2));
@@ -382,7 +375,6 @@ router.get("/dashboard", async (req: Request, res: Response) => {
 
       const quantity = Number(holding.quantity);
       const averageCost = Number(holding.averageCost);
-
       const marketValue = Number((quantity * quote.price).toFixed(2));
 
       const unrealizedPnl = Number(
