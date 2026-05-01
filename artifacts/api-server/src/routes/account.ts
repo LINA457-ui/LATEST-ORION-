@@ -139,11 +139,7 @@ router.post("/sync", async (req: Request, res: Response) => {
   };
 
   await ensureAccount(userId, displayName, email);
-
-  res.json({
-    ok: true,
-    userId,
-  });
+  res.json({ ok: true, userId });
 });
 
 router.post("/avatar", async (req: Request, res: Response) => {
@@ -271,16 +267,23 @@ router.post("/transactions", async (req: Request, res: Response) => {
     return;
   }
 
-  const values: typeof transactions.$inferInsert = {
-    userId,
-    type: type.trim(),
-    description: description.trim(),
-    amount: String(numericAmount),
-    symbol: symbol ? symbol.toUpperCase().trim() : null,
-  };
+  const inserted = await db
+    .insert(transactions)
+    .values({
+      userId,
+      type: type.trim(),
+      description: description.trim(),
+      amount: String(numericAmount),
+      symbol: symbol ? symbol.toUpperCase().trim() : null,
+    } as any)
+    .returning();
 
-  const inserted = await db.insert(transactions).values(values).returning();
   const tx = inserted[0];
+
+  if (!tx) {
+    res.status(500).json({ error: "Failed to create transaction." });
+    return;
+  }
 
   res.status(201).json({
     id: tx.id,
