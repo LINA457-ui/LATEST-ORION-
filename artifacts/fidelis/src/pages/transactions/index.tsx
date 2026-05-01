@@ -22,48 +22,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 type Transaction = {
   id: string | number;
-  createdAt?: string | Date | null;
-  type?: string | null;
-  description?: string | null;
-  amount?: number | null;
+  type: string;
+  description: string;
+  amount: number | string;
+  createdAt: string | Date;
 };
-
-const fallbackTransactions: Transaction[] = [
-  {
-    id: "demo-1",
-    createdAt: new Date().toISOString(),
-    type: "deposit",
-    description: "Initial account funding",
-    amount: 10000,
-  },
-  {
-    id: "demo-2",
-    createdAt: new Date().toISOString(),
-    type: "buy",
-    description: "Bought AAPL shares",
-    amount: -1200,
-  },
-  {
-    id: "demo-3",
-    createdAt: new Date().toISOString(),
-    type: "dividend",
-    description: "Dividend payout",
-    amount: 85.5,
-  },
-];
 
 export default function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const { data: transactionsData, isLoading } = useListTransactions();
+  const { data, isLoading } = useListTransactions();
 
-  const transactions: Transaction[] = Array.isArray(transactionsData)
-    ? transactionsData
-    : fallbackTransactions;
+  const transactions: Transaction[] = Array.isArray(data)
+    ? data
+    : Array.isArray((data as any)?.transactions)
+      ? (data as any).transactions
+      : Array.isArray((data as any)?.data)
+        ? (data as any).data
+        : [];
 
-  const filtered = transactions.filter((t) => {
-    const type = t.type || "unknown";
-    return typeFilter === "all" || type === typeFilter;
-  });
+  const filtered = transactions.filter(
+    (t) => typeFilter === "all" || t.type === typeFilter
+  );
 
   const getBadgeColor = (type: string) => {
     switch (type) {
@@ -100,13 +79,14 @@ export default function TransactionsPage() {
               <SelectTrigger>
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
-
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="deposit">Deposits</SelectItem>
                 <SelectItem value="buy">Buys</SelectItem>
                 <SelectItem value="sell">Sells</SelectItem>
                 <SelectItem value="dividend">Dividends</SelectItem>
+                <SelectItem value="fee">Fees</SelectItem>
+                <SelectItem value="withdrawal">Withdrawals</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -131,15 +111,12 @@ export default function TransactionsPage() {
                       <TableCell className="pl-6">
                         <Skeleton className="h-4 w-24" />
                       </TableCell>
-
                       <TableCell>
                         <Skeleton className="h-6 w-16 rounded-full" />
                       </TableCell>
-
                       <TableCell>
                         <Skeleton className="h-4 w-48" />
                       </TableCell>
-
                       <TableCell className="pr-6">
                         <Skeleton className="h-4 w-20 ml-auto" />
                       </TableCell>
@@ -156,29 +133,25 @@ export default function TransactionsPage() {
                   </TableRow>
                 ) : (
                   filtered.map((t) => {
-                    const type = t.type || "unknown";
-                    const amount =
-                      typeof t.amount === "number" ? t.amount : 0;
+                    const amount = Number(t.amount ?? 0);
 
                     return (
                       <TableRow key={t.id}>
                         <TableCell className="pl-6 text-muted-foreground whitespace-nowrap">
-                          {t.createdAt
-                            ? formatDateTime(t.createdAt as any)
-                            : "N/A"}
+                          {formatDateTime(t.createdAt)}
                         </TableCell>
 
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className={`capitalize ${getBadgeColor(type)}`}
+                            className={`capitalize ${getBadgeColor(t.type)}`}
                           >
-                            {type}
+                            {t.type}
                           </Badge>
                         </TableCell>
 
                         <TableCell className="font-medium text-foreground/80">
-                          {t.description || "No description"}
+                          {t.description}
                         </TableCell>
 
                         <TableCell

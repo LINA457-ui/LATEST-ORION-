@@ -133,9 +133,7 @@ export default function AdminUserDetail() {
     setDisplayName(account.displayName ?? "");
     setEmail(account.email ?? "");
     setAvatarUrl(account.avatarUrl ?? "");
-
     setCashBalance(String(account.cashBalance ?? 0));
-
     setIsAdmin(Boolean(account.isAdmin));
     setIsSuspended(Boolean(account.isSuspended));
 
@@ -274,9 +272,11 @@ export default function AdminUserDetail() {
   const addHoldingMutation = useMutation({
     mutationFn: () => {
       if (!holdingSymbol.trim()) throw new Error("Symbol is required.");
+
       if (!holdingQuantity || Number(holdingQuantity) <= 0) {
         throw new Error("Quantity must be greater than 0.");
       }
+
       if (holdingAverageCost === "" || Number(holdingAverageCost) < 0) {
         throw new Error("Average cost is required.");
       }
@@ -769,7 +769,9 @@ export default function AdminUserDetail() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Transaction Upload / History ({transactions.length})</CardTitle>
+          <CardTitle>
+            Transaction Upload / History ({transactions.length})
+          </CardTitle>
           <p className="text-sm text-muted-foreground">
             Add deposits, buys, sells, dividends, fees, or withdrawals for this
             user.
@@ -892,7 +894,9 @@ export default function AdminUserDetail() {
                     return (
                       <tr key={rowId} className="border-t">
                         <td className="px-4 py-2">
-                          {createdAt ? new Date(createdAt).toLocaleString() : "—"}
+                          {createdAt
+                            ? new Date(createdAt).toLocaleString()
+                            : "—"}
                         </td>
 
                         <td className="px-4 py-2">

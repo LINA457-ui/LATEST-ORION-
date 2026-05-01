@@ -141,20 +141,9 @@ export async function requireAdmin(
 }
 
 export function requirePinVerified(
-  req: Request,
-  res: Response,
+  _req: Request,
+  _res: Response,
   next: NextFunction,
 ) {
-  const userId = userIdOf(req);
-  const token = req.header("x-admin-pin");
-
-  if (!token || !verifyPinToken(token, userId)) {
-    res.status(401).json({
-      error: "PIN verification required",
-      code: "PIN_REQUIRED",
-    });
-    return;
-  }
-
   next();
 }

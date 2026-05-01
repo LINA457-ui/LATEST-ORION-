@@ -39,7 +39,7 @@ async function getAccountSnapshot(userId: string) {
     portfolioValue += qty * q.price;
     dayChange += qty * q.change;
   }
- const cashBalance = Number(account.cashBalance ?? 0);
+  const cashBalance = Number(account.cashBalance);
   const computedPortfolioValue = +portfolioValue.toFixed(2);
   const computedTotalEquity = +(portfolioValue + cashBalance).toFixed(2);
   const computedDayChange = +dayChange.toFixed(2);
@@ -49,49 +49,26 @@ async function getAccountSnapshot(userId: string) {
 
   // Admin-set display overrides (when present) take precedence over computed
   // figures so the dashboard stays stable regardless of market simulator state.
- const totalEquity =
-  account.equityOverride != null
-    ? Number(account.equityOverride)
-    : computedTotalEquity;
-
-const portfolioValue =
-  account.marketValueOverride != null
-    ? Number(account.marketValueOverride)
-    : computedPortfolioValue;
-
-const buyingPower =
-  account.buyingPowerOverride != null
-    ? Number(account.buyingPowerOverride)
-    : cashBalance;
-
-const dayChange =
-  account.dayChangeOverride != null
-    ? Number(account.dayChangeOverride)
-    : computedDayChange;
-
-const dayChangePercent =
-  account.dayChangePercentOverride != null
-    ? Number(account.dayChangePercentOverride)
-    : computedDayChangePercent;
-
-return {
-  userId,
-  displayName: account.displayName,
-  avatarUrl: account.avatarUrl ?? null,
-
-  cashBalance,
-  totalEquity,
-  portfolioValue,
-  buyingPower,
-  dayChange,
-  dayChangePercent,
-
-  displayedTotalEquity: totalEquity,
-  displayedPortfolioValue: portfolioValue,
-  displayedBuyingPower: buyingPower,
-  displayedDayChange: dayChange,
-  displayedDayChangePercent: dayChangePercent,
-};
+  const portfolioValueDisplay =
+    account.marketValueOverride != null
+      ? Number(account.marketValueOverride)
+      : computedPortfolioValue;
+  const totalEquityDisplay =
+    account.equityOverride != null
+      ? Number(account.equityOverride)
+      : computedTotalEquity;
+  const buyingPowerDisplay =
+    account.buyingPowerOverride != null
+      ? Number(account.buyingPowerOverride)
+      : cashBalance;
+  const dayChangeDisplay =
+    account.dayChangeOverride != null
+      ? Number(account.dayChangeOverride)
+      : computedDayChange;
+  const dayChangePercentDisplay =
+    account.dayChangePercentOverride != null
+      ? Number(account.dayChangePercentOverride)
+      : computedDayChangePercent;
 
   return {
     userId,
