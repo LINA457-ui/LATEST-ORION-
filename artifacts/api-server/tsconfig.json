@@ -3,18 +3,18 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": ["node"],
+
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+
+    "composite": false,
+    "incremental": false,
+    "noEmit": false,
+
+    "skipLibCheck": true
   },
-  "include": ["src"],
-  "references": [
-    {
-      "path": "../../lib/db"
-    },
-    {
-      "path": "../../lib/api-zod"
-    },
-    {
-      "path": "../../lib/integrations-openai-ai-server"
-    }
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules"]
 }
