@@ -29,7 +29,7 @@ const router = Router();
 
 router.use(requireAuth);
 
-type AccountSnapshot = {
+export type AccountSnapshot = {
   userId: string;
   displayName: string | null;
   avatarUrl: string | null;
