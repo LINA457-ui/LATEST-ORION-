@@ -30,7 +30,31 @@ import { useToast } from "@/hooks/use-toast";
 
 type Range = "1D" | "1W" | "1M" | "3M" | "1Y" | "ALL";
 
-const dummyQuotes: Record<string, any> = {
+type Quote = {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  previousClose: number;
+  open: number;
+  dayLow: number;
+  dayHigh: number;
+  yearLow: number;
+  yearHigh: number;
+  marketCap: number;
+  volume: number;
+  peRatio: number;
+  dividendYield: number;
+  description: string;
+};
+
+type ChartPoint = {
+  t: string;
+  c: number;
+};
+
+const dummyQuotes: Record<string, Quote> = {
   AAPL: {
     symbol: "AAPL",
     name: "Apple Inc.",
@@ -147,7 +171,7 @@ const dummyQuotes: Record<string, any> = {
   },
 };
 
-const dummyChartByRange: Record<Range, { t: string; c: number }[]> = {
+const dummyChartByRange: Record<Range, ChartPoint[]> = {
   "1D": [
     { t: "2026-05-01T09:00:00", c: 194.8 },
     { t: "2026-05-01T10:00:00", c: 195.7 },
@@ -195,9 +219,46 @@ const dummyChartByRange: Record<Range, { t: string; c: number }[]> = {
   ],
 };
 
+const ranges: Range[] = ["1D", "1W", "1M", "3M", "1Y", "ALL"];
+
+function toSafeSymbol(value: unknown): string {
+  if (typeof value !== "string") return "AAPL";
+
+  const cleaned = value.trim().toUpperCase();
+
+  return cleaned || "AAPL";
+}
+
+function safeNumber(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function formatChartLabel(value: unknown, range: Range) {
+  const date = new Date(String(value));
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value ?? "");
+  }
+
+  if (range === "1D") {
+    return `${date.getHours()}:${date.getMinutes().toString().padStart(2, "0")}`;
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export default function SymbolDetailPage() {
-  const { symbol } = useParams();
-  const safeSymbol = (symbol || "AAPL").toUpperCase();
+  const params = useParams<{ symbol?: string }>();
+
+const safeSymbol =
+  typeof params?.symbol === "string" && params.symbol.trim()
+    ? params.symbol.toUpperCase()
+    : "AAPL";
+
 
   const [range, setRange] = useState<Range>("1M");
   const [side, setSide] = useState<"buy" | "sell">("buy");
@@ -207,28 +268,29 @@ export default function SymbolDetailPage() {
 
   const { toast } = useToast();
 
-  const quote = dummyQuotes[safeSymbol] || dummyQuotes.AAPL;
-  const chart = dummyChartByRange[range];
+  const quote = dummyQuotes[safeSymbol] ?? dummyQuotes.AAPL;
+  const chart = dummyChartByRange[range] ?? dummyChartByRange["1M"];
 
   usePageBreadcrumb(quote.symbol);
 
-  const isPositive = quote.change >= 0;
+  const qty = safeNumber(quantity);
+  const isPositive = safeNumber(quote.change) >= 0;
+  const estimatedTotal = safeNumber(quote.price) * qty;
 
   const handleWatchlistToggle = () => {
-    setIsWatched((prev) => !prev);
+    const nextValue = !isWatched;
+    setIsWatched(nextValue);
 
     toast({
-      title: isWatched ? "Removed from watchlist" : "Added to watchlist",
+      title: nextValue ? "Added to watchlist" : "Removed from watchlist",
       description: `${quote.symbol} has been ${
-        isWatched ? "removed from" : "added to"
+        nextValue ? "added to" : "removed from"
       } your watchlist.`,
     });
   };
 
   const handleTrade = async () => {
-    const qty = parseFloat(quantity);
-
-    if (!qty || qty <= 0 || Number.isNaN(qty)) {
+    if (!qty || qty <= 0) {
       toast({
         title: "Invalid quantity",
         description: "Please enter a valid share quantity.",
@@ -239,7 +301,7 @@ export default function SymbolDetailPage() {
 
     setIsOrdering(true);
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       setIsOrdering(false);
 
       toast({
@@ -252,10 +314,10 @@ export default function SymbolDetailPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/markets">
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
 
@@ -266,10 +328,10 @@ export default function SymbolDetailPage() {
           <p className="text-muted-foreground">{quote.name}</p>
         </div>
 
-        <div className="ml-auto flex items-center gap-4">
+        <div className="sm:ml-auto flex items-center gap-4">
           <Button variant="outline" size="sm" onClick={handleWatchlistToggle}>
             <Star
-              className={`w-4 h-4 mr-2 ${
+              className={`mr-2 h-4 w-4 ${
                 isWatched ? "fill-primary text-primary" : ""
               }`}
             />
@@ -278,18 +340,18 @@ export default function SymbolDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-end justify-between">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                   <div className="text-4xl font-bold">
                     {formatCurrency(quote.price)}
                   </div>
 
                   <div
-                    className={`text-lg font-medium mt-1 ${
+                    className={`mt-1 text-lg font-medium ${
                       isPositive ? "text-success" : "text-destructive"
                     }`}
                   >
@@ -298,28 +360,27 @@ export default function SymbolDetailPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-1 bg-muted p-1 rounded-md mb-1">
-                  {(["1D", "1W", "1M", "3M", "1Y", "ALL"] as const).map(
-                    (r) => (
-                      <button
-                        key={r}
-                        onClick={() => setRange(r)}
-                        className={`px-3 py-1 text-xs font-medium rounded-sm transition-colors ${
-                          range === r
-                            ? "bg-background shadow-sm text-foreground"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {r}
-                      </button>
-                    )
-                  )}
+                <div className="flex w-fit gap-1 rounded-md bg-muted p-1">
+                  {ranges.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRange(r)}
+                      className={`rounded-sm px-3 py-1 text-xs font-medium transition-colors ${
+                        range === r
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
                 </div>
               </div>
             </CardHeader>
 
             <CardContent>
-              <div className="h-[400px] w-full mt-4">
+              <div className="mt-4 h-[400px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={chart}
@@ -358,19 +419,7 @@ export default function SymbolDetailPage() {
 
                     <XAxis
                       dataKey="t"
-                      tickFormatter={(val) => {
-                        const d = new Date(val);
-
-                        return range === "1D"
-                          ? `${d.getHours()}:${d
-                              .getMinutes()
-                              .toString()
-                              .padStart(2, "0")}`
-                          : d.toLocaleDateString(undefined, {
-                              month: "short",
-                              day: "numeric",
-                            });
-                      }}
+                      tickFormatter={(value) => formatChartLabel(value, range)}
                       stroke="hsl(var(--muted-foreground))"
                       fontSize={12}
                       tickLine={false}
@@ -380,7 +429,9 @@ export default function SymbolDetailPage() {
 
                     <YAxis
                       domain={["auto", "auto"]}
-                      tickFormatter={(val) => `$${val}`}
+                      tickFormatter={(value) =>
+                        `$${safeNumber(value).toFixed(0)}`
+                      }
                       stroke="hsl(var(--muted-foreground))"
                       fontSize={12}
                       tickLine={false}
@@ -395,13 +446,16 @@ export default function SymbolDetailPage() {
                         borderRadius: "0.5rem",
                         fontSize: "14px",
                       }}
-                      formatter={(value: number) => [
-                        formatCurrency(value),
+                      formatter={(value) => [
+                        formatCurrency(safeNumber(value)),
                         "Price",
                       ]}
-                      labelFormatter={(label) =>
-                        new Date(label).toLocaleString()
-                      }
+                      labelFormatter={(label) => {
+                        const date = new Date(String(label));
+                        return Number.isNaN(date.getTime())
+                          ? String(label ?? "")
+                          : date.toLocaleString();
+                      }}
                     />
 
                     <Area
@@ -426,13 +480,13 @@ export default function SymbolDetailPage() {
             </CardHeader>
 
             <CardContent>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+              <p className="mb-6 text-sm leading-relaxed text-muted-foreground">
                 {quote.description}
               </p>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-4">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-6 md:grid-cols-4">
                 <div>
-                  <div className="text-xs text-muted-foreground mb-1">
+                  <div className="mb-1 text-xs text-muted-foreground">
                     Previous Close
                   </div>
                   <div className="font-medium">
@@ -441,16 +495,14 @@ export default function SymbolDetailPage() {
                 </div>
 
                 <div>
-                  <div className="text-xs text-muted-foreground mb-1">
-                    Open
-                  </div>
+                  <div className="mb-1 text-xs text-muted-foreground">Open</div>
                   <div className="font-medium">
                     {formatCurrency(quote.open)}
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-xs text-muted-foreground mb-1">
+                  <div className="mb-1 text-xs text-muted-foreground">
                     Day Range
                   </div>
                   <div className="font-medium">
@@ -460,7 +512,7 @@ export default function SymbolDetailPage() {
                 </div>
 
                 <div>
-                  <div className="text-xs text-muted-foreground mb-1">
+                  <div className="mb-1 text-xs text-muted-foreground">
                     52W Range
                   </div>
                   <div className="font-medium">
@@ -470,7 +522,7 @@ export default function SymbolDetailPage() {
                 </div>
 
                 <div>
-                  <div className="text-xs text-muted-foreground mb-1">
+                  <div className="mb-1 text-xs text-muted-foreground">
                     Market Cap
                   </div>
                   <div className="font-medium">
@@ -479,7 +531,7 @@ export default function SymbolDetailPage() {
                 </div>
 
                 <div>
-                  <div className="text-xs text-muted-foreground mb-1">
+                  <div className="mb-1 text-xs text-muted-foreground">
                     Volume
                   </div>
                   <div className="font-medium">
@@ -488,7 +540,7 @@ export default function SymbolDetailPage() {
                 </div>
 
                 <div>
-                  <div className="text-xs text-muted-foreground mb-1">
+                  <div className="mb-1 text-xs text-muted-foreground">
                     P/E Ratio
                   </div>
                   <div className="font-medium">
@@ -497,13 +549,11 @@ export default function SymbolDetailPage() {
                 </div>
 
                 <div>
-                  <div className="text-xs text-muted-foreground mb-1">
+                  <div className="mb-1 text-xs text-muted-foreground">
                     Div Yield
                   </div>
                   <div className="font-medium">
-                    {formatPercent(
-                      quote.dividendYield ? quote.dividendYield * 100 : 0
-                    )}
+                    {formatPercent(quote.dividendYield * 100)}
                   </div>
                 </div>
               </div>
@@ -513,16 +563,17 @@ export default function SymbolDetailPage() {
 
         <div>
           <Card className="sticky top-24">
-            <CardHeader className="bg-muted/30 border-b pb-4">
+            <CardHeader className="border-b bg-muted/30 pb-4">
               <CardTitle>Trade {quote.symbol}</CardTitle>
             </CardHeader>
 
-            <CardContent className="pt-6 space-y-6">
-              <div className="flex p-1 bg-muted rounded-md">
+            <CardContent className="space-y-6 pt-6">
+              <div className="flex rounded-md bg-muted p-1">
                 <button
-                  className={`flex-1 py-2 text-sm font-bold rounded-sm transition-colors ${
+                  type="button"
+                  className={`flex-1 rounded-sm py-2 text-sm font-bold transition-colors ${
                     side === "buy"
-                      ? "bg-background shadow-sm text-foreground"
+                      ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground"
                   }`}
                   onClick={() => setSide("buy")}
@@ -531,9 +582,10 @@ export default function SymbolDetailPage() {
                 </button>
 
                 <button
-                  className={`flex-1 py-2 text-sm font-bold rounded-sm transition-colors ${
+                  type="button"
+                  className={`flex-1 rounded-sm py-2 text-sm font-bold transition-colors ${
                     side === "sell"
-                      ? "bg-background shadow-sm text-foreground"
+                      ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground"
                   }`}
                   onClick={() => setSide("sell")}
@@ -543,7 +595,7 @@ export default function SymbolDetailPage() {
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <label className="text-sm font-medium">
                     Quantity (Shares)
                   </label>
@@ -570,19 +622,19 @@ export default function SymbolDetailPage() {
                   </span>
                 </div>
 
-                <div className="pt-4 border-t flex items-center justify-between">
+                <div className="flex items-center justify-between border-t pt-4">
                   <span className="font-bold">Estimated Total</span>
-                  <span className="font-bold text-lg">
-                    {formatCurrency(quote.price * (parseFloat(quantity) || 0))}
+                  <span className="text-lg font-bold">
+                    {formatCurrency(estimatedTotal)}
                   </span>
                 </div>
               </div>
 
               <Button
-                className="w-full h-12 text-base font-bold"
+                className="h-12 w-full text-base font-bold"
                 size="lg"
                 onClick={handleTrade}
-                disabled={isOrdering || !parseFloat(quantity)}
+                disabled={isOrdering || qty <= 0}
                 variant={side === "buy" ? "default" : "destructive"}
               >
                 {isOrdering

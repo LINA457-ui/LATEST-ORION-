@@ -7,7 +7,10 @@ const PIN_TOKEN_KEY = "orion_admin_pin_token";
 export const adminPinSession = {
   get(): string | null {
     try {
-      return sessionStorage.getItem(PIN_TOKEN_KEY);
+      return (
+        sessionStorage.getItem(PIN_TOKEN_KEY) ||
+        localStorage.getItem("admin_pin_token")
+      );
     } catch {
       return null;
     }
@@ -16,17 +19,15 @@ export const adminPinSession = {
   set(token: string) {
     try {
       sessionStorage.setItem(PIN_TOKEN_KEY, token);
-    } catch {
-      // ignore
-    }
+      localStorage.setItem("admin_pin_token", token);
+    } catch {}
   },
 
   clear() {
     try {
       sessionStorage.removeItem(PIN_TOKEN_KEY);
-    } catch {
-      // ignore
-    }
+      localStorage.removeItem("admin_pin_token");
+    } catch {}
   },
 };
 
@@ -47,14 +48,17 @@ interface RequestOpts extends RequestInit {
   withPin?: boolean;
 }
 
-async function request<T>(path: string, init?: RequestOpts): Promise<T> {
+async function request<T = any>(
+  path: string,
+  init: RequestOpts = {}
+): Promise<T> {
   const token = await getToken();
 
   const headers: Record<string, string> = {
-    ...((init?.headers as Record<string, string>) ?? {}),
+    ...((init.headers as Record<string, string>) ?? {}),
   };
 
-  if (init?.body) {
+  if (init.body) {
     headers["Content-Type"] = "application/json";
   }
 
@@ -62,7 +66,7 @@ async function request<T>(path: string, init?: RequestOpts): Promise<T> {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  if (init?.withPin !== false) {
+  if (init.withPin !== false) {
     const pinToken = adminPinSession.get();
 
     if (pinToken) {
@@ -82,9 +86,7 @@ async function request<T>(path: string, init?: RequestOpts): Promise<T> {
 
     try {
       body = await res.clone().json();
-    } catch {
-      // ignore
-    }
+    } catch {}
 
     if (body.code === "PIN_REQUIRED") {
       adminPinSession.clear();
@@ -97,13 +99,10 @@ async function request<T>(path: string, init?: RequestOpts): Promise<T> {
 
     try {
       const body = await res.clone().json();
-      message = body?.error || message;
+      message = body?.error || body?.message || message;
     } catch {
       const text = await res.text().catch(() => "");
-
-      if (text) {
-        message = text;
-      }
+      if (text) message = text;
     }
 
     throw new Error(message);
@@ -118,15 +117,8 @@ async function request<T>(path: string, init?: RequestOpts): Promise<T> {
 
 export const adminApi = {
   syncMe: () =>
-    request<{ ok: true }>("/api/account/sync", {
+    request("/api/account/sync", {
       method: "POST",
-      withPin: false,
-    }),
-
-  uploadAvatar: (avatarUrl: string | null) =>
-    request<{ ok: true; avatarUrl: string | null }>("/api/account/avatar", {
-      method: "POST",
-      body: JSON.stringify({ avatarUrl }),
       withPin: false,
     }),
 
@@ -135,82 +127,38 @@ export const adminApi = {
       withPin: false,
     }),
 
-  verifyPin: (pin: string) =>
-    request<{ ok: true; token: string }>("/api/admin/pin/verify", {
-      method: "POST",
-      body: JSON.stringify({ pin }),
-      withPin: false,
-    }),
+  verifyPin: async (pin: string) => {
+    const res = await request<{ ok: boolean; token: string }>(
+      "/api/admin/pin/verify",
+      {
+        method: "POST",
+        body: JSON.stringify({ pin }),
+        withPin: false,
+      }
+    );
 
-  listPins: () => request<AdminPinRow[]>("/api/admin/pins"),
+    adminPinSession.set(res.token);
+    return res;
+  },
 
-  createPin: (pin: string, label?: string) =>
-    request<{ ok: true; id: number }>("/api/admin/pins", {
-      method: "POST",
-      body: JSON.stringify({ pin, label }),
-    }),
-
-  updatePin: (id: number, body: { pin?: string; label?: string }) =>
-    request<{ ok: true }>(`/api/admin/pins/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(body),
-    }),
-
-  deletePin: (id: number) =>
-    request<{ ok: true }>(`/api/admin/pins/${id}`, {
-      method: "DELETE",
-    }),
-
-  overview: () => request<AdminOverview>("/api/admin/overview"),
-
-  users: () => request<AdminUserSummary[]>("/api/admin/users"),
+  users: () => request<any[]>("/api/admin/users"),
 
   user: (userId: string) =>
-    request<AdminUserDetail>(
-      `/api/admin/users/${encodeURIComponent(userId)}`,
-    ),
+    request<any>(`/api/admin/users/${encodeURIComponent(userId)}`),
 
-  updateUser: (
-    userId: string,
-    body: {
-      displayName?: string;
-      email?: string;
-      avatarUrl?: string;
-      isAdmin?: boolean;
-      isSuspended?: boolean;
-    },
-  ) =>
-    request<{ ok: true }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
+  updateUser: (userId: string, body: any) =>
+    request(`/api/admin/users/${encodeURIComponent(userId)}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
 
   updateCash: (
     userId: string,
-    body: {
-      cashBalance: number;
-      note?: string;
-    },
+    body: { cashBalance: number; note?: string }
   ) =>
-    request<{
-      ok: true;
-      oldBalance: number;
-      newBalance: number;
-      delta: number;
-    }>(`/api/admin/users/${encodeURIComponent(userId)}/cash`, {
+    request(`/api/admin/users/${encodeURIComponent(userId)}/cash`, {
       method: "PATCH",
       body: JSON.stringify(body),
-    }),
-
-  setCash: (userId: string, cashBalance: number, note?: string) =>
-    request<{
-      ok: true;
-      oldBalance: number;
-      newBalance: number;
-      delta: number;
-    }>(`/api/admin/users/${encodeURIComponent(userId)}/cash`, {
-      method: "PATCH",
-      body: JSON.stringify({ cashBalance, note }),
     }),
 
   updateOverrides: (
@@ -221,116 +169,57 @@ export const adminApi = {
       buyingPower?: number | null;
       dayChange?: number | null;
       dayChangePercent?: number | null;
-    },
-  ) => {
-    console.log("🔥 CALLING updateOverrides API", userId, body);
-
-    return request<{ ok: true }>(
-      `/api/admin/users/${encodeURIComponent(userId)}/overrides`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      },
-    );
-  },
-
-  setOverrides: (
-    userId: string,
-    body: Partial<{
-      equity: number | null;
-      marketValue: number | null;
-      buyingPower: number | null;
-      dayChange: number | null;
-      dayChangePercent: number | null;
-    }>,
+    }
   ) =>
-    request<{ ok: true }>(
-      `/api/admin/users/${encodeURIComponent(userId)}/overrides`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      },
-    ),
+    request(`/api/admin/users/${encodeURIComponent(userId)}/overrides`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
-  upsertHolding: (
-    userId: string,
-    body: {
-      symbol: string;
-      quantity: number;
-      averageCost: number;
-    },
-  ) =>
-    request<{ ok: true }>(
-      `/api/admin/users/${encodeURIComponent(userId)}/holdings`,
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
-    ),
+  upsertHolding: (userId: string, body: any) =>
+    request(`/api/admin/users/${encodeURIComponent(userId)}/holdings`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   deleteHolding: (userId: string, symbol: string) =>
-    request<{ ok: true }>(
-      `/api/admin/users/${encodeURIComponent(userId)}/holdings/${encodeURIComponent(
-        symbol,
-      )}`,
+    request(
+      `/api/admin/users/${encodeURIComponent(
+        userId
+      )}/holdings/${encodeURIComponent(symbol)}`,
       {
         method: "DELETE",
-      },
+      }
     ),
 
   createTransaction: (
     userId: string,
-    body: {
+    data: {
       type: string;
       description: string;
       amount: number;
       symbol?: string | null;
       createdAt?: string;
-    },
+    }
   ) =>
-    request<{
-      ok: true;
-      transaction: AdminUserDetail["recentTransactions"][number];
-    }>(
-      `/api/admin/users/${encodeURIComponent(userId)}/transactions`,
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
-    ),
-
-  updateTransaction: (
-    id: number,
-    body: Partial<{
-      type: string;
-      description: string;
-      amount: number;
-      symbol: string | null;
-      createdAt: string;
-    }>,
-  ) =>
-    request<{ ok: true }>(`/api/admin/transactions/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(body),
+    request(`/api/admin/users/${encodeURIComponent(userId)}/transactions`, {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
 
   deleteTransaction: (id: number) =>
-    request<{ ok: true }>(`/api/admin/transactions/${id}`, {
+    request(`/api/admin/transactions/${id}`, {
       method: "DELETE",
     }),
 
+  transactions: () => request<any[]>("/api/admin/transactions"),
+
+  orders: () => request<any[]>("/api/admin/orders"),
+
   deleteUser: (userId: string) =>
-    request<{ ok: true }>(
-      `/api/admin/users/${encodeURIComponent(userId)}`,
-      {
-        method: "DELETE",
-      },
-    ),
-
-  orders: () => request<AdminOrderRow[]>("/api/admin/orders"),
-
-  transactions: () =>
-    request<AdminTransactionRow[]>("/api/admin/transactions"),
+    request(`/api/admin/users/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }),
 };
 
 export interface AdminOverview {

@@ -459,6 +459,18 @@ router.get("/users/:userId", async (req, res) => {
         ? Number(account.dayChangePercentOverride)
         : 0;
 
+    const userTransactions = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.userId, userId))
+      .orderBy(desc(transactions.createdAt))
+      .limit(100);
+
+    const userPositions = await db
+      .select()
+      .from(holdings)
+      .where(eq(holdings.userId, userId));
+
     res.json({
       account: {
         userId: account.userId,
@@ -506,8 +518,33 @@ router.get("/users/:userId", async (req, res) => {
         },
       },
 
-      positions: [],
-      recentTransactions: [],
+      positions: userPositions.map((p) => {
+        const q = getQuote(p.symbol);
+        const meta = getMeta(p.symbol);
+
+        const quantity = Number(p.quantity);
+        const averageCost = Number(p.averageCost);
+        const currentPrice = q?.price ?? 0;
+
+        return {
+          id: p.id,
+          symbol: p.symbol,
+          name: meta?.name ?? p.symbol,
+          quantity,
+          averageCost,
+          currentPrice,
+          marketValue: +(quantity * currentPrice).toFixed(2),
+        };
+      }),
+
+      transactions: userTransactions.map((t) => ({
+        id: t.id,
+        type: t.type,
+        description: t.description,
+        amount: Number(t.amount),
+        symbol: t.symbol ?? null,
+        createdAt: t.createdAt.toISOString(),
+      })),
     });
   } catch (err) {
     console.error("Admin user fetch failed:", err);
