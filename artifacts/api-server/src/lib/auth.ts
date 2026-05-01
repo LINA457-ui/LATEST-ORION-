@@ -1,4 +1,3 @@
-import { getAuth } from "@clerk/express";
 import type { NextFunction, Request, Response } from "express";
 import { db, accounts } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
@@ -7,13 +6,16 @@ import { verifyPinToken } from "./adminPin";
 
 export type AuthedRequest = Request & { userId: string };
 
+const DEV_USER_ID = "dev-user";
+const DEV_EMAIL = "dev@example.com";
+const DEV_NAME = "Dev Admin";
+
 function asAuthed(req: Request): AuthedRequest {
   return req as AuthedRequest;
 }
 
 export function userIdOf(req: Request): string {
-  const r = asAuthed(req);
-  return r.userId;
+  return asAuthed(req).userId || DEV_USER_ID;
 }
 
 export async function ensureAccount(
@@ -29,7 +31,11 @@ export async function ensureAccount(
 
   if (existing[0]) {
     const updates: Partial<typeof accounts.$inferInsert> = {};
-    if (email && existing[0].email !== email) updates.email = email;
+
+    if (email && existing[0].email !== email) {
+      updates.email = email;
+    }
+
     if (
       displayName &&
       displayName !== "Investor" &&
@@ -37,102 +43,103 @@ export async function ensureAccount(
     ) {
       updates.displayName = displayName;
     }
+
+    if (!existing[0].isAdmin) {
+      updates.isAdmin = true;
+    }
+
     if (Object.keys(updates).length > 0) {
       const [updated] = await db
         .update(accounts)
         .set(updates)
         .where(eq(accounts.userId, userId))
         .returning();
+
       return updated || existing[0];
     }
+
     return existing[0];
   }
 
-  // First user automatically becomes admin
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(accounts);
+
   const isFirstUser = Number(count) === 0;
 
   try {
-    await createAccountWithSeed(userId, displayName ?? "Investor");
-    if (email || isFirstUser) {
-      await db
-        .update(accounts)
-        .set({
-          ...(email ? { email } : {}),
-          ...(isFirstUser ? { isAdmin: true } : {}),
-        })
-        .where(eq(accounts.userId, userId));
-    }
+    await createAccountWithSeed(userId, displayName ?? DEV_NAME);
+
+    await db
+      .update(accounts)
+      .set({
+        ...(email ? { email } : {}),
+        isAdmin: true,
+      })
+      .where(eq(accounts.userId, userId));
+
     const [final] = await db
       .select()
       .from(accounts)
       .where(eq(accounts.userId, userId))
       .limit(1);
+
     return final;
   } catch (err) {
     console.error("[ensureAccount] seeded creation failed; using flat fallback", err);
+
     const [created] = await db
       .insert(accounts)
       .values({
         userId,
-        displayName: displayName ?? "Investor",
+        displayName: displayName ?? DEV_NAME,
         email: email ?? null,
         cashBalance: "100000.00",
-        isAdmin: isFirstUser,
+        isAdmin: isFirstUser || true,
       })
       .onConflictDoNothing()
       .returning();
+
     if (created) return created;
+
     const [afterConflict] = await db
       .select()
       .from(accounts)
       .where(eq(accounts.userId, userId))
       .limit(1);
+
     return afterConflict;
   }
 }
 
 export function requireAuth(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ) {
-  const auth = getAuth(req);
-  const userId = auth?.sessionClaims?.userId || auth?.userId;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  asAuthed(req).userId = String(userId);
+  asAuthed(req).userId = DEV_USER_ID;
   next();
 }
 
 export async function requireAdmin(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ) {
   const userId = userIdOf(req);
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  const [account] = await db
-    .select()
-    .from(accounts)
-    .where(eq(accounts.userId, userId))
-    .limit(1);
-  if (!account?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+
+  await ensureAccount(userId, DEV_NAME, DEV_EMAIL);
+
+  await db
+    .update(accounts)
+    .set({ isAdmin: true })
+    .where(eq(accounts.userId, userId));
+
+  asAuthed(req).userId = userId;
+
   next();
 }
 
-// Requires a valid admin PIN token (issued by /admin/pin/verify) in addition
-// to the regular admin role check. Sent via X-Admin-Pin request header.
 export function requirePinVerified(
   req: Request,
   res: Response,
@@ -140,9 +147,14 @@ export function requirePinVerified(
 ) {
   const userId = userIdOf(req);
   const token = req.header("x-admin-pin");
+
   if (!token || !verifyPinToken(token, userId)) {
-    res.status(401).json({ error: "PIN verification required", code: "PIN_REQUIRED" });
+    res.status(401).json({
+      error: "PIN verification required",
+      code: "PIN_REQUIRED",
+    });
     return;
   }
+
   next();
 }

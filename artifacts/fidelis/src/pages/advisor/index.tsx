@@ -1,259 +1,419 @@
-import { useState, useEffect, useRef } from "react";
-import { 
-  useListOpenaiConversations, 
-  useCreateOpenaiConversation, 
-  useGetOpenaiConversation, 
-  useDeleteOpenaiConversation, 
-  useListOpenaiMessages 
-} from "@workspace/api-client-react";
-import { streamAdvisorMessage } from "@/lib/openaiStream";
-import { useAuth } from "@clerk/react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Plus, Trash2, BrainCircuit, User as UserIcon } from "lucide-react";
-import { queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import {
+  Send,
+  Plus,
+  Trash2,
+  BrainCircuit,
+  User as UserIcon,
+  Sparkles,
+  TrendingUp,
+  ShieldCheck,
+  Wallet,
+} from "lucide-react";
 
 type LocalMessage = {
-  id: string | number;
-  role: "user" | "assistant" | "system";
+  id: string;
+  role: "user" | "assistant";
   content: string;
 };
 
+type Conversation = {
+  id: number;
+  title: string;
+  messages: LocalMessage[];
+};
+
+const starterMessages: LocalMessage[] = [
+  {
+    id: "welcome-1",
+    role: "assistant",
+    content:
+      "Welcome to Orion Advisor. I can help you review your portfolio, explain market movement, compare stocks, and suggest smarter trading decisions using demo insights.",
+  },
+];
+
+const quickPrompts = [
+  {
+    icon: TrendingUp,
+    label: "Analyze my portfolio",
+    prompt: "Analyze my portfolio performance and tell me what looks strong.",
+  },
+  {
+    icon: Wallet,
+    label: "Improve my cash strategy",
+    prompt: "How should I manage my cash balance and buying power?",
+  },
+  {
+    icon: ShieldCheck,
+    label: "Reduce risk",
+    prompt: "How can I reduce risk in my current holdings?",
+  },
+  {
+    icon: Sparkles,
+    label: "Best opportunities",
+    prompt: "What are the best opportunities in this demo market today?",
+  },
+];
+
+function generateAdvisorReply(message: string) {
+  const text = message.toLowerCase();
+
+  if (text.includes("portfolio")) {
+    return `Your demo portfolio looks strong and growth-focused.
+
+Key observations:
+• Total equity is healthy and trending upward.
+• Tech exposure is carrying most of the gains.
+• NVDA and MSFT look like strong momentum holdings.
+• TSLA adds upside, but also increases volatility.
+
+Smart move:
+Keep your winners, but avoid becoming too concentrated in one sector. A balanced portfolio should mix growth, cash, and defensive positions.`;
+  }
+
+  if (text.includes("cash") || text.includes("buying power")) {
+    return `Your cash position gives you flexibility.
+
+A smart cash strategy:
+• Keep part of your cash for quick opportunities.
+• Avoid using all buying power at once.
+• Enter positions gradually instead of buying everything in one trade.
+• Use cash as protection when the market becomes uncertain.
+
+In simple terms: cash is not weakness — it is control.`;
+  }
+
+  if (text.includes("risk")) {
+    return `To reduce risk, focus on balance.
+
+Risk control ideas:
+• Do not let one stock dominate your portfolio.
+• Take partial profit from fast-moving stocks.
+• Keep a watchlist before entering new trades.
+• Use smaller position sizes on volatile names.
+• Review your exposure to tech-heavy assets.
+
+The goal is not just to make money. The goal is to stay in the game long enough to compound.`;
+  }
+
+  if (text.includes("opportunit") || text.includes("best")) {
+    return `Based on this demo market setup, the strongest opportunities appear to be:
+
+• NVDA — strong AI momentum and high market interest.
+• MSFT — stable growth, cloud strength, and enterprise demand.
+• AAPL — strong ecosystem and defensive brand power.
+• AMZN — long-term cloud and commerce upside.
+
+Best approach:
+Do not chase everything. Pick 1–2 strong setups and build patiently.`;
+  }
+
+  return `Here is my advisor-style take:
+
+Your question points to decision quality, not just market movement. The best traders think in systems.
+
+What I would focus on:
+• Understand why you are entering a position.
+• Know your risk before thinking about profit.
+• Avoid emotional buying after a big move.
+• Keep enough cash for better opportunities.
+• Review performance weekly, not every minute.
+
+A strong portfolio is built with patience, discipline, and clean execution.`;
+}
+
 export default function AdvisorPage() {
-  const { getToken } = useAuth();
-  const { toast } = useToast();
-  
-  const { data: conversations, isLoading: loadingConvos } = useListOpenaiConversations();
-  const createConvo = useCreateOpenaiConversation();
-  const deleteConvo = useDeleteOpenaiConversation();
+  const [conversations, setConversations] = useState<Conversation[]>([
+    {
+      id: 1,
+      title: "Portfolio Strategy",
+      messages: starterMessages,
+    },
+  ]);
 
-  const [activeId, setActiveId] = useState<number | null>(null);
-  
-  // Auto-select first or create new
-  useEffect(() => {
-    if (!loadingConvos && conversations) {
-      if (conversations.length > 0 && !activeId) {
-        setActiveId(conversations[0].id);
-      } else if (conversations.length === 0 && !createConvo.isPending) {
-        createConvo.mutate({ data: { title: "New Chat" } }, {
-          onSuccess: (res) => {
-            setActiveId(res.id);
-            queryClient.invalidateQueries({ queryKey: ["/api/openai/conversations"] });
-          }
-        });
-      }
-    }
-  }, [loadingConvos, conversations, activeId]);
-
-  const { data: serverMessages, isLoading: loadingMsgs } = useListOpenaiMessages(activeId!, { 
-    query: { enabled: !!activeId, queryKey: ["/api/openai/conversations", activeId, "messages"] } 
-  });
-
-  const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
+  const [activeId, setActiveId] = useState(1);
   const [input, setInput] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Sync server messages to local state when not streaming
-  useEffect(() => {
-    if (serverMessages && !isStreaming) {
-      setLocalMessages(
-        (serverMessages as Array<{ id: string | number; role: string; content: string }>).map((m) => ({
-          id: m.id,
-          role: (m.role === "user" || m.role === "assistant" || m.role === "system" ? m.role : "assistant") as "user" | "assistant" | "system",
-          content: m.content,
-        }))
-      );
-    }
-  }, [serverMessages, isStreaming, activeId]);
+  const activeConversation =
+    conversations.find((conversation) => conversation.id === activeId) ||
+    conversations[0];
 
-  // Auto scroll to bottom
+  const localMessages = activeConversation?.messages || [];
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [localMessages]);
+  }, [localMessages, isThinking]);
 
-  const handleCreate = async () => {
-    try {
-      const res = await createConvo.mutateAsync({ data: { title: "New Chat" } });
-      setActiveId(res.id);
-      queryClient.invalidateQueries({ queryKey: ["/api/openai/conversations"] });
-    } catch (e) {
-      toast({ title: "Failed to create conversation", variant: "destructive" });
-    }
+  const handleCreate = () => {
+    const nextId = Date.now();
+
+    const newConversation: Conversation = {
+      id: nextId,
+      title: "New Advisor Chat",
+      messages: starterMessages,
+    };
+
+    setConversations((prev) => [newConversation, ...prev]);
+    setActiveId(nextId);
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: number) => {
+  const handleDelete = (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
-    try {
-      await deleteConvo.mutateAsync({ id });
-      if (activeId === id) setActiveId(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/openai/conversations"] });
-    } catch (e) {
-      toast({ title: "Failed to delete", variant: "destructive" });
-    }
+
+    setConversations((prev) => {
+      const remaining = prev.filter((conversation) => conversation.id !== id);
+
+      if (activeId === id && remaining.length > 0) {
+        setActiveId(remaining[0].id);
+      }
+
+      if (remaining.length === 0) {
+        const freshConversation = {
+          id: Date.now(),
+          title: "New Advisor Chat",
+          messages: starterMessages,
+        };
+
+        setActiveId(freshConversation.id);
+        return [freshConversation];
+      }
+
+      return remaining;
+    });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isStreaming) return;
+  const sendMessage = (message: string) => {
+    if (!message.trim() || isThinking) return;
 
-    let convId = activeId;
-    if (!convId) {
-      try {
-        const res = await createConvo.mutateAsync({ data: { title: "New Chat" } });
-        convId = res.id;
-        setActiveId(res.id);
-        queryClient.invalidateQueries({ queryKey: ["/api/openai/conversations"] });
-      } catch (err) {
-        toast({ title: "Failed to start conversation", variant: "destructive" });
-        return;
-      }
-    }
+    const userMessage: LocalMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: message.trim(),
+    };
 
-    const userMsg = input.trim();
     setInput("");
-    
-    // Optimistic UI
-    const newUserMsg: LocalMessage = { id: Date.now(), role: "user", content: userMsg };
-    const tempAssistantMsg: LocalMessage = { id: Date.now() + 1, role: "assistant", content: "" };
-    
-    setLocalMessages(prev => [...prev, newUserMsg, tempAssistantMsg]);
-    setIsStreaming(true);
 
-    await streamAdvisorMessage({
-      conversationId: convId,
-      content: userMsg,
-      getToken,
-      onDelta: (text) => {
-        setLocalMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last.role === "assistant") {
-            return [...prev.slice(0, -1), { ...last, content: last.content + text }];
-          }
-          return prev;
-        });
-      },
-      onDone: () => {
-        setIsStreaming(false);
-        queryClient.invalidateQueries({ queryKey: ["/api/openai/conversations", activeId, "messages"] });
-      },
-      onError: (err) => {
-        toast({ title: "Stream error", description: err.message, variant: "destructive" });
-        setIsStreaming(false);
-        setLocalMessages(prev => prev.slice(0, -1)); // Remove temp message
-      }
-    });
+    setConversations((prev) =>
+      prev.map((conversation) =>
+        conversation.id === activeId
+          ? {
+              ...conversation,
+              title:
+                conversation.title === "New Advisor Chat"
+                  ? message.trim().slice(0, 32)
+                  : conversation.title,
+              messages: [...conversation.messages, userMessage],
+            }
+          : conversation
+      )
+    );
+
+    setIsThinking(true);
+
+    setTimeout(() => {
+      const assistantMessage: LocalMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: generateAdvisorReply(message),
+      };
+
+      setConversations((prev) =>
+        prev.map((conversation) =>
+          conversation.id === activeId
+            ? {
+                ...conversation,
+                messages: [...conversation.messages, assistantMessage],
+              }
+            : conversation
+        )
+      );
+
+      setIsThinking(false);
+    }, 700);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendMessage(input);
   };
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-4 pb-4">
-      {/* Sidebar */}
-      <Card className="w-64 flex flex-col shrink-0 hidden md:flex overflow-hidden">
-        <div className="p-4 border-b">
-          <Button className="w-full" onClick={handleCreate} disabled={createConvo.isPending}>
-            <Plus className="w-4 h-4 mr-2" /> New Chat
+      <Card className="w-72 flex-col shrink-0 hidden md:flex overflow-hidden border-muted">
+        <div className="p-4 border-b bg-muted/20">
+          <Button className="w-full" onClick={handleCreate}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Chat
           </Button>
         </div>
+
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
-            {loadingConvos ? (
-              Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
-            ) : (
-              conversations?.map(c => (
-                <div 
-                  key={c.id}
-                  onClick={() => setActiveId(c.id)}
-                  className={`group flex items-center justify-between px-3 py-2 text-sm rounded-md cursor-pointer transition-colors ${activeId === c.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-muted-foreground"}`}
+            {conversations.map((conversation) => (
+              <div
+                key={conversation.id}
+                onClick={() => setActiveId(conversation.id)}
+                className={`group flex items-center justify-between px-3 py-2 text-sm rounded-md cursor-pointer transition-colors ${
+                  activeId === conversation.id
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "hover:bg-muted text-muted-foreground"
+                }`}
+              >
+                <span className="truncate pr-2">{conversation.title}</span>
+
+                <button
+                  type="button"
+                  onClick={(e) => handleDelete(e, conversation.id)}
+                  className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-opacity"
                 >
-                  <span className="truncate pr-2">{c.title}</span>
-                  <button 
-                    onClick={(e) => handleDelete(e, c.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-opacity"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))
-            )}
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
           </div>
         </ScrollArea>
+
+        <div className="border-t p-4 text-xs text-muted-foreground bg-muted/20">
+          Static demo advisor. No backend required.
+        </div>
       </Card>
 
-      {/* Main Chat Area */}
       <Card className="flex-1 flex flex-col overflow-hidden bg-muted/10 border-muted">
-        <>
-            <div className="flex-1 overflow-y-auto p-4 space-y-6" ref={scrollRef}>
-              {localMessages.map((msg, i) => (
-                <div key={msg.id || i} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {msg.role === 'assistant' && (
-                    <div className="w-8 h-8 rounded bg-primary text-primary-foreground flex items-center justify-center shrink-0">
-                      <BrainCircuit className="w-5 h-5" />
-                    </div>
-                  )}
-                  <div className={`px-4 py-3 rounded-xl max-w-[80%] ${
-                    msg.role === 'user' 
-                      ? 'bg-primary text-primary-foreground rounded-br-none' 
-                      : 'bg-card border shadow-sm rounded-bl-none text-card-foreground prose prose-sm dark:prose-invert max-w-none'
-                  }`}>
-                    {msg.role === 'assistant' ? (
-                      msg.content ? (
-                        <div className="whitespace-pre-wrap">{msg.content}</div>
-                      ) : (
-                        <div className="flex gap-1 items-center h-5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </div>
-                      )
-                    ) : (
-                      <div className="whitespace-pre-wrap">{msg.content}</div>
-                    )}
-                  </div>
-                  {msg.role === 'user' && (
-                    <div className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0">
-                      <UserIcon className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                  )}
+        <div className="border-b bg-background px-5 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center">
+              <BrainCircuit className="w-5 h-5" />
+            </div>
+
+            <div>
+              <h1 className="font-bold leading-tight">Orion Advisor</h1>
+              <p className="text-xs text-muted-foreground">
+                Static AI-style portfolio assistant
+              </p>
+            </div>
+          </div>
+
+          <Button size="sm" variant="outline" onClick={handleCreate}>
+            <Plus className="w-4 h-4 mr-2" />
+            New
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-6" ref={scrollRef}>
+          {localMessages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex gap-4 ${
+                msg.role === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
+              {msg.role === "assistant" && (
+                <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+                  <BrainCircuit className="w-5 h-5" />
                 </div>
-              ))}
-              {localMessages.length === 0 && !loadingMsgs && (
-                <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-70">
-                  <BrainCircuit className="w-12 h-12 mb-4" />
-                  <p className="text-base font-medium">Orion Advisor</p>
-                  <p className="text-sm mt-1">How can I help you analyze the markets today?</p>
+              )}
+
+              <div
+                className={`px-4 py-3 rounded-xl max-w-[82%] leading-relaxed ${
+                  msg.role === "user"
+                    ? "bg-primary text-primary-foreground rounded-br-none"
+                    : "bg-card border shadow-sm rounded-bl-none text-card-foreground"
+                }`}
+              >
+                <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+              </div>
+
+              {msg.role === "user" && (
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                  <UserIcon className="w-5 h-5 text-muted-foreground" />
                 </div>
               )}
             </div>
-            
-            <div className="p-4 bg-background border-t">
-              <form onSubmit={handleSubmit} className="relative flex items-center">
-                <Input 
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask about a symbol, portfolio strategy, or market news..."
-                  className="pr-12 py-6 text-base rounded-full bg-muted/50 border-muted focus-visible:ring-primary"
-                  disabled={isStreaming}
-                />
-                <Button 
-                  type="submit" 
-                  size="icon" 
-                  className="absolute right-1.5 rounded-full h-9 w-9"
-                  disabled={!input.trim() || isStreaming}
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
-              </form>
-              <div className="text-center text-xs text-muted-foreground mt-2">
-                Orion Advisor can make mistakes. Consider verifying important information.
+          ))}
+
+          {isThinking && (
+            <div className="flex gap-4 justify-start">
+              <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+                <BrainCircuit className="w-5 h-5" />
+              </div>
+
+              <div className="px-4 py-3 rounded-xl bg-card border shadow-sm rounded-bl-none">
+                <div className="flex gap-1 items-center h-5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce"
+                    style={{ animationDelay: "150ms" }}
+                  />
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce"
+                    style={{ animationDelay: "300ms" }}
+                  />
+                </div>
               </div>
             </div>
-          </>
+          )}
+
+          {localMessages.length <= 1 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+              {quickPrompts.map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <button
+                    key={item.label}
+                    onClick={() => sendMessage(item.prompt)}
+                    className="text-left rounded-xl border bg-background hover:bg-muted/60 transition-colors p-4"
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <span className="font-semibold text-sm">
+                        {item.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {item.prompt}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 bg-background border-t">
+          <form onSubmit={handleSubmit} className="relative flex items-center">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about portfolio strategy, risk, stocks, or buying power..."
+              className="pr-12 py-6 text-base rounded-full bg-muted/50 border-muted focus-visible:ring-primary"
+              disabled={isThinking}
+            />
+
+            <Button
+              type="submit"
+              size="icon"
+              className="absolute right-1.5 rounded-full h-9 w-9"
+              disabled={!input.trim() || isThinking}
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </form>
+
+          <div className="text-center text-xs text-muted-foreground mt-2">
+            Demo advisor responses are static and educational.
+          </div>
+        </div>
       </Card>
     </div>
   );

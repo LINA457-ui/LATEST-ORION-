@@ -1,4 +1,4 @@
-import { useUser } from "@clerk/react";
+import { useUser } from "@clerk/clerk-react";
 import { useLocation, Link } from "wouter";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -45,10 +45,7 @@ export default function MarketingPage() {
         <div className="container max-w-6xl mx-auto px-4 text-center text-sm text-muted-foreground">
           <div className="flex justify-center mb-6 opacity-50 grayscale"><Logo /></div>
           <p className="mb-2">© {new Date().getFullYear()} Orion Investment. All rights reserved.</p>
-          <p className="max-w-2xl mx-auto text-xs">
-            Orion Investment is a simulated paper-trading application built for demonstration purposes. 
-            No real money is transacted. Not financial advice.
-          </p>
+         
         </div>
       </footer>
     </div>
@@ -61,9 +58,7 @@ function HeroSection() {
       <h1 className="font-serif text-5xl md:text-7xl font-bold tracking-tight text-foreground max-w-4xl mx-auto leading-tight">
         Invest with <span className="text-primary">conviction.</span>
       </h1>
-      <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-        Experience institutional-grade tools with zero commission. Master the markets with our real-time paper trading platform and on-demand AI advisor.
-      </p>
+     
       <div className="flex items-center justify-center gap-4 pt-4">
         <Button size="lg" className="text-base h-12 px-8" asChild>
           <Link href="/sign-up">

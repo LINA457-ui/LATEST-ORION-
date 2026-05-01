@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import app from "./app";
 import { logger } from "./lib/logger";
 import { ensureDefaultPin } from "./lib/adminPin";
@@ -24,8 +27,6 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 
-  // Seed the default admin PIN (1805) on first boot. Idempotent — only
-  // inserts if the admin_pins table is empty.
   ensureDefaultPin().catch((e: unknown) => {
     logger.error({ err: e }, "Failed to seed default admin PIN");
   });

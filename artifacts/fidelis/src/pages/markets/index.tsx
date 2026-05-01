@@ -1,204 +1,546 @@
 import { useState } from "react";
-import { useListQuotes, useGetMarketMovers, useGetMarketIndices, useGetMarketNews } from "@workspace/api-client-react";
-import { formatCurrency, formatChange, formatCompact } from "@/lib/format";
+import { useParams, Link } from "wouter";
+import { usePageBreadcrumb } from "@/components/layout/AppBreadcrumb";
+import {
+  formatCurrency,
+  formatChange,
+  formatCompact,
+  formatNumber,
+  formatPercent,
+} from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ChevronRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { ArrowLeft, Star, CheckCircle2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-export default function MarketsPage() {
-  const [search, setSearch] = useState("");
-  
-  const { data: quotes, isLoading: loadingQuotes } = useListQuotes();
-  const { data: movers, isLoading: loadingMovers } = useGetMarketMovers();
-  const { data: indices, isLoading: loadingIndices } = useGetMarketIndices();
-  const { data: news, isLoading: loadingNews } = useGetMarketNews();
+type Range = "1D" | "1W" | "1M" | "3M" | "1Y" | "ALL";
 
-  const filteredQuotes = quotes?.filter(q => 
-    q.symbol.toLowerCase().includes(search.toLowerCase()) || 
-    q.name.toLowerCase().includes(search.toLowerCase())
-  );
+const dummyQuotes = {
+  AAPL: {
+    symbol: "AAPL",
+    name: "Apple Inc.",
+    price: 198.42,
+    change: 2.34,
+    changePercent: 1.19,
+    previousClose: 196.08,
+    open: 197.1,
+    dayLow: 195.82,
+    dayHigh: 199.25,
+    yearLow: 164.08,
+    yearHigh: 237.49,
+    marketCap: 2980000000000,
+    volume: 58234120,
+    peRatio: 30.42,
+    dividendYield: 0.005,
+    description:
+      "Apple Inc. designs and builds consumer electronics, software, services, and digital products used by customers around the world.",
+  },
+  MSFT: {
+    symbol: "MSFT",
+    name: "Microsoft Corporation",
+    price: 431.22,
+    change: 4.18,
+    changePercent: 0.98,
+    previousClose: 427.04,
+    open: 428.11,
+    dayLow: 426.8,
+    dayHigh: 433.5,
+    yearLow: 350.1,
+    yearHigh: 468.35,
+    marketCap: 3210000000000,
+    volume: 32459100,
+    peRatio: 36.74,
+    dividendYield: 0.007,
+    description:
+      "Microsoft Corporation develops software, cloud services, AI platforms, enterprise tools, gaming products, and productivity solutions.",
+  },
+  NVDA: {
+    symbol: "NVDA",
+    name: "NVIDIA Corporation",
+    price: 122.88,
+    change: 3.72,
+    changePercent: 3.12,
+    previousClose: 119.16,
+    open: 120.52,
+    dayLow: 119.8,
+    dayHigh: 124.1,
+    yearLow: 75.2,
+    yearHigh: 153.13,
+    marketCap: 3010000000000,
+    volume: 74219000,
+    peRatio: 44.15,
+    dividendYield: 0.0003,
+    description:
+      "NVIDIA Corporation builds advanced chips, graphics processors, AI infrastructure, gaming technology, and data center solutions.",
+  },
+  TSLA: {
+    symbol: "TSLA",
+    name: "Tesla Inc.",
+    price: 244.91,
+    change: -2.16,
+    changePercent: -0.87,
+    previousClose: 247.07,
+    open: 246.3,
+    dayLow: 241.88,
+    dayHigh: 248.74,
+    yearLow: 138.8,
+    yearHigh: 299.29,
+    marketCap: 781000000000,
+    volume: 68125000,
+    peRatio: 68.32,
+    dividendYield: 0,
+    description:
+      "Tesla Inc. designs and manufactures electric vehicles, battery systems, clean energy products, and related technology.",
+  },
+};
+
+const dummyChartByRange: Record<Range, { t: string; c: number }[]> = {
+  "1D": [
+    { t: "2026-05-01T09:00:00", c: 194.8 },
+    { t: "2026-05-01T10:00:00", c: 195.7 },
+    { t: "2026-05-01T11:00:00", c: 196.2 },
+    { t: "2026-05-01T12:00:00", c: 197.1 },
+    { t: "2026-05-01T13:00:00", c: 196.9 },
+    { t: "2026-05-01T14:00:00", c: 198.1 },
+    { t: "2026-05-01T15:00:00", c: 198.42 },
+  ],
+  "1W": [
+    { t: "2026-04-27", c: 190.2 },
+    { t: "2026-04-28", c: 192.4 },
+    { t: "2026-04-29", c: 193.7 },
+    { t: "2026-04-30", c: 196.08 },
+    { t: "2026-05-01", c: 198.42 },
+  ],
+  "1M": [
+    { t: "2026-04-01", c: 181.4 },
+    { t: "2026-04-07", c: 184.8 },
+    { t: "2026-04-14", c: 188.5 },
+    { t: "2026-04-21", c: 193.2 },
+    { t: "2026-05-01", c: 198.42 },
+  ],
+  "3M": [
+    { t: "2026-02-01", c: 168.5 },
+    { t: "2026-03-01", c: 176.9 },
+    { t: "2026-04-01", c: 181.4 },
+    { t: "2026-05-01", c: 198.42 },
+  ],
+  "1Y": [
+    { t: "2025-06-01", c: 164.2 },
+    { t: "2025-08-01", c: 172.3 },
+    { t: "2025-10-01", c: 179.1 },
+    { t: "2025-12-01", c: 188.7 },
+    { t: "2026-02-01", c: 190.4 },
+    { t: "2026-05-01", c: 198.42 },
+  ],
+  ALL: [
+    { t: "2021-01-01", c: 89.2 },
+    { t: "2022-01-01", c: 121.5 },
+    { t: "2023-01-01", c: 139.4 },
+    { t: "2024-01-01", c: 158.7 },
+    { t: "2025-01-01", c: 177.2 },
+    { t: "2026-05-01", c: 198.42 },
+  ],
+};
+
+export default function SymbolDetailPage() {
+  const { symbol } = useParams();
+  const safeSymbol = (symbol || "AAPL").toUpperCase();
+  const [range, setRange] = useState<Range>("1M");
+  const [isWatched, setIsWatched] = useState(false);
+  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [quantity, setQuantity] = useState("1");
+  const [isOrdering, setIsOrdering] = useState(false);
+
+  const { toast } = useToast();
+
+  const quote =
+    dummyQuotes[safeSymbol as keyof typeof dummyQuotes] || dummyQuotes.AAPL;
+
+  const chart = dummyChartByRange[range];
+
+  usePageBreadcrumb(quote.symbol);
+
+  const isPositive = quote.change >= 0;
+
+  const handleWatchlistToggle = () => {
+    setIsWatched((prev) => !prev);
+
+    toast({
+      title: !isWatched ? "Added to watchlist" : "Removed from watchlist",
+    });
+  };
+
+  const handleTrade = () => {
+    const qty = parseFloat(quantity);
+
+    if (!qty || qty <= 0 || Number.isNaN(qty)) {
+      toast({
+        title: "Invalid quantity",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsOrdering(true);
+
+    setTimeout(() => {
+      setIsOrdering(false);
+
+      toast({
+        title: "Order Placed",
+        description: `${side.toUpperCase()} ${qty} shares of ${quote.symbol}`,
+        action: <CheckCircle2 className="w-4 h-4 text-success" />,
+      });
+    }, 700);
+  };
 
   return (
-    <div className="space-y-8 pb-8">
-      <div>
-        <h1 className="text-3xl font-serif font-bold tracking-tight">Markets</h1>
-        <p className="text-muted-foreground">Market research, quotes, and breaking news</p>
+    <div className="space-y-6 pb-8">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/markets">
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+        </Button>
+
+        <div>
+          <h1 className="text-3xl font-serif font-bold tracking-tight">
+            {quote.symbol}
+          </h1>
+          <p className="text-muted-foreground">{quote.name}</p>
+        </div>
+
+        <div className="ml-auto flex items-center gap-4">
+          <Button variant="outline" size="sm" onClick={handleWatchlistToggle}>
+            <Star
+              className={`w-4 h-4 mr-2 ${
+                isWatched ? "fill-primary text-primary" : ""
+              }`}
+            />
+            {isWatched ? "Watching" : "Watch"}
+          </Button>
+        </div>
       </div>
 
-      {/* Indices Ticker Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {loadingIndices ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
-        ) : (
-          indices?.map(idx => (
-            <Card key={idx.symbol}>
-              <CardContent className="p-4">
-                <div className="text-sm font-bold text-muted-foreground mb-1">{idx.name}</div>
-                <div className="text-xl font-bold">{formatCurrency(idx.value)}</div>
-                <div className={`text-sm font-medium ${idx.change >= 0 ? "text-success" : "text-destructive"}`}>
-                  {formatChange(idx.change)} ({formatChange(idx.changePercent, true)})
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle>Market Movers</CardTitle>
+              <div className="flex items-end justify-between">
+                <div>
+                  <div className="text-4xl font-bold">
+                    {formatCurrency(quote.price)}
+                  </div>
+
+                  <div
+                    className={`text-lg font-medium mt-1 ${
+                      isPositive ? "text-success" : "text-destructive"
+                    }`}
+                  >
+                    {formatChange(quote.change)} (
+                    {formatChange(quote.changePercent, true)})
+                  </div>
+                </div>
+
+                <div className="flex gap-1 bg-muted p-1 rounded-md mb-1">
+                  {(["1D", "1W", "1M", "3M", "1Y", "ALL"] as const).map(
+                    (r) => (
+                      <button
+                        key={r}
+                        onClick={() => setRange(r)}
+                        className={`px-3 py-1 text-xs font-medium rounded-sm transition-colors ${
+                          range === r
+                            ? "bg-background shadow-sm text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
             </CardHeader>
+
             <CardContent>
-              <Tabs defaultValue="gainers">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="gainers" className="data-[state=active]:text-success">Top Gainers</TabsTrigger>
-                  <TabsTrigger value="losers" className="data-[state=active]:text-destructive">Top Losers</TabsTrigger>
-                  <TabsTrigger value="active">Most Active</TabsTrigger>
-                </TabsList>
-                
-                {["gainers", "losers", "mostActive"].map(tab => (
-                  <TabsContent key={tab} value={tab} className="mt-0">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                      {loadingMovers ? (
-                         Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)
-                      ) : (
-                        movers?.[tab as keyof typeof movers]?.map(quote => (
-                          <Link key={quote.symbol} href={`/markets/${quote.symbol}`}>
-                            <div className="p-3 border rounded-lg hover:border-primary transition-colors bg-muted/20 cursor-pointer">
-                              <div className="flex justify-between items-start mb-2">
-                                <span className="font-bold">{quote.symbol}</span>
-                                <span className="font-medium">{formatCurrency(quote.price)}</span>
-                              </div>
-                              <div className="flex justify-between items-center text-sm">
-                                <span className="text-muted-foreground truncate w-24">{quote.name}</span>
-                                <span className={quote.change >= 0 ? "text-success font-medium" : "text-destructive font-medium"}>
-                                  {formatChange(quote.changePercent, true)}
-                                </span>
-                              </div>
-                            </div>
-                          </Link>
-                        ))
-                      )}
-                    </div>
-                  </TabsContent>
-                ))}
-              </Tabs>
+              <div className="h-[400px] w-full mt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={chart}
+                    margin={{ top: 5, right: 0, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id="colorPrice"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={`hsl(var(--${
+                            isPositive ? "success" : "destructive"
+                          }))`}
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={`hsl(var(--${
+                            isPositive ? "success" : "destructive"
+                          }))`}
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="hsl(var(--border))"
+                    />
+
+                    <XAxis
+                      dataKey="t"
+                      tickFormatter={(val) => {
+                        const d = new Date(val);
+
+                        return range === "1D"
+                          ? `${d.getHours()}:${d
+                              .getMinutes()
+                              .toString()
+                              .padStart(2, "0")}`
+                          : d.toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            });
+                      }}
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      minTickGap={30}
+                    />
+
+                    <YAxis
+                      domain={["auto", "auto"]}
+                      tickFormatter={(val) => `$${val}`}
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      width={60}
+                    />
+
+                    <RechartsTooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--popover))",
+                        borderColor: "hsl(var(--border))",
+                        borderRadius: "0.5rem",
+                        fontSize: "14px",
+                      }}
+                      formatter={(value: number) => [
+                        formatCurrency(value),
+                        "Price",
+                      ]}
+                      labelFormatter={(label) =>
+                        new Date(label).toLocaleString()
+                      }
+                    />
+
+                    <Area
+                      type="monotone"
+                      dataKey="c"
+                      stroke={`hsl(var(--${
+                        isPositive ? "success" : "destructive"
+                      }))`}
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#colorPrice)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>All Symbols</CardTitle>
-                <div className="relative w-64">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Search symbols or names..." 
-                    className="pl-9 bg-muted/50"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-              </div>
+              <CardTitle>About {quote.name}</CardTitle>
             </CardHeader>
+
             <CardContent>
-              <div className="rounded-md border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Symbol</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Sector</TableHead>
-                      <TableHead className="text-right">Price</TableHead>
-                      <TableHead className="text-right">Change</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loadingQuotes ? (
-                       Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}>
-                          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                        </TableRow>
-                       ))
-                    ) : filteredQuotes?.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                          No symbols found matching "{search}"
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredQuotes?.map((quote) => (
-                        <TableRow key={quote.symbol} className="cursor-pointer hover:bg-muted/50" onClick={() => window.location.href = `/markets/${quote.symbol}`}>
-                          <TableCell className="font-bold text-primary">{quote.symbol}</TableCell>
-                          <TableCell className="font-medium text-muted-foreground">{quote.name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="font-normal text-xs">{quote.sector}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(quote.price)}</TableCell>
-                          <TableCell className={`text-right font-medium ${quote.change >= 0 ? "text-success" : "text-destructive"}`}>
-                            {formatChange(quote.change)} <span className="text-xs opacity-80">({formatChange(quote.changePercent, true)})</span>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+                {quote.description}
+              </p>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-4">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    Previous Close
+                  </div>
+                  <div className="font-medium">
+                    {formatCurrency(quote.previousClose)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    Open
+                  </div>
+                  <div className="font-medium">
+                    {formatCurrency(quote.open)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    Day Range
+                  </div>
+                  <div className="font-medium">
+                    {formatCurrency(quote.dayLow)} -{" "}
+                    {formatCurrency(quote.dayHigh)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    52W Range
+                  </div>
+                  <div className="font-medium">
+                    {formatCurrency(quote.yearLow)} -{" "}
+                    {formatCurrency(quote.yearHigh)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    Market Cap
+                  </div>
+                  <div className="font-medium">
+                    {formatCompact(quote.marketCap)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    Volume
+                  </div>
+                  <div className="font-medium">
+                    {formatCompact(quote.volume)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    P/E Ratio
+                  </div>
+                  <div className="font-medium">
+                    {formatNumber(quote.peRatio)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    Div Yield
+                  </div>
+                  <div className="font-medium">
+                    {formatPercent(quote.dividendYield * 100)}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
         <div>
-          <Card className="h-full border-muted">
-            <CardHeader className="border-b bg-muted/20 pb-4">
-              <CardTitle className="text-lg">Breaking News</CardTitle>
+          <Card className="sticky top-24">
+            <CardHeader className="bg-muted/30 border-b pb-4">
+              <CardTitle>Trade {quote.symbol}</CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y">
-                {loadingNews ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="p-4 space-y-2">
-                      <Skeleton className="h-3 w-32" />
-                      <Skeleton className="h-10 w-full" />
-                    </div>
-                  ))
-                ) : (
-                  news?.map(item => (
-                    <a key={item.id} href="#" className="block p-4 hover:bg-muted/30 transition-colors group">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                        <span className="font-bold text-foreground/80">{item.source}</span>
-                        <span>{new Date(item.publishedAt).toLocaleDateString()}</span>
-                      </div>
-                      <h4 className="font-medium leading-snug group-hover:text-primary transition-colors mb-2">
-                        {item.headline}
-                      </h4>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                        {item.summary}
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {item.symbols.map(sym => (
-                          <Badge key={sym} variant="secondary" className="text-[10px] px-1.5 py-0">
-                            {sym}
-                          </Badge>
-                        ))}
-                      </div>
-                    </a>
-                  ))
-                )}
+
+            <CardContent className="pt-6 space-y-6">
+              <div className="flex p-1 bg-muted rounded-md">
+                <button
+                  className={`flex-1 py-2 text-sm font-bold rounded-sm transition-colors ${
+                    side === "buy"
+                      ? "bg-background shadow-sm text-foreground"
+                      : "text-muted-foreground"
+                  }`}
+                  onClick={() => setSide("buy")}
+                >
+                  Buy
+                </button>
+
+                <button
+                  className={`flex-1 py-2 text-sm font-bold rounded-sm transition-colors ${
+                    side === "sell"
+                      ? "bg-background shadow-sm text-foreground"
+                      : "text-muted-foreground"
+                  }`}
+                  onClick={() => setSide("sell")}
+                >
+                  Sell
+                </button>
               </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">
+                    Quantity (Shares)
+                  </label>
+
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    className="w-32 text-right"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Order Type</span>
+                  <span className="font-medium">Market</span>
+                </div>
+
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Est. Price</span>
+                  <span className="font-medium">
+                    {formatCurrency(quote.price)}
+                  </span>
+                </div>
+
+                <div className="pt-4 border-t flex items-center justify-between">
+                  <span className="font-bold">Estimated Total</span>
+                  <span className="font-bold text-lg">
+                    {formatCurrency(quote.price * (parseFloat(quantity) || 0))}
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                className="w-full h-12 text-base font-bold"
+                size="lg"
+                onClick={handleTrade}
+                disabled={isOrdering || !parseFloat(quantity)}
+                variant={side === "buy" ? "default" : "destructive"}
+              >
+                {isOrdering
+                  ? "Processing..."
+                  : `Place ${side.toUpperCase()} Order`}
+              </Button>
             </CardContent>
           </Card>
         </div>

@@ -33,28 +33,36 @@ export function PinGate({
     }
   }, [open]);
 
-  async function submit() {
-    if (!pin) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const res = await adminApi.verifyPin(pin);
-      adminPinSession.set(res.token);
-      onOpenChange(false);
-      onSuccess?.();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Something went wrong";
-      // Friendly fallback if the server returns a generic message
-      setError(
-        msg.toLowerCase().includes("pin")
-          ? msg
-          : "That PIN didn't work. Please double-check and try again.",
-      );
-      setPin("");
-    } finally {
-      setSubmitting(false);
-    }
+async function submit() {
+  if (!pin) return;
+
+  setSubmitting(true);
+  setError(null);
+
+  try {
+    const res = await adminApi.verifyPin(pin);
+
+    // save in your real adminApi session helper
+    adminPinSession.set(res.token);
+
+    console.log("✅ PIN verified and saved:", res.token);
+
+    onOpenChange(false);
+    onSuccess?.();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Something went wrong";
+
+    setError(
+      msg.toLowerCase().includes("pin")
+        ? msg
+        : "That PIN didn't work. Please double-check and try again.",
+    );
+
+    setPin("");
+  } finally {
+    setSubmitting(false);
   }
+}
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

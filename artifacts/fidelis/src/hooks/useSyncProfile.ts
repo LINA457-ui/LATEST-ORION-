@@ -1,33 +1,44 @@
-import { useEffect, useRef } from "react";
-import { useUser } from "@clerk/react";
+import { useEffect } from "react";
+import { useUser } from "@clerk/clerk-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/adminApi";
 
-// Pushes the user's Clerk email + name to the backend on first signed-in mount
-// so the admin dashboard can display real identifying info, and the very first
-// user gets auto-promoted to admin (handled server-side in ensureAccount).
 export function useSyncProfile() {
-  const { isSignedIn, user } = useUser();
-  const sentRef = useRef<string | null>(null);
   const qc = useQueryClient();
+  const { user, isLoaded, isSignedIn } = useUser();
 
   useEffect(() => {
-    if (!isSignedIn || !user) return;
-    const key = `${user.id}|${user.primaryEmailAddress?.emailAddress ?? ""}|${user.fullName ?? ""}`;
-    if (sentRef.current === key) return;
-    sentRef.current = key;
-    adminApi
-      .syncMe({
-        email: user.primaryEmailAddress?.emailAddress ?? undefined,
-        displayName: user.fullName ?? undefined,
-      })
-      .then(() => {
-        // Re-check admin status after sync, since first-user promotion happens
-        // inside the same ensureAccount call that sync triggers.
-        qc.invalidateQueries({ queryKey: ["admin", "check", user.id] });
-      })
-      .catch(() => {
-        sentRef.current = null;
-      });
-  }, [isSignedIn, user, qc]);
+    if (!isLoaded || !isSignedIn || !user) return;
+
+    let cancelled = false;
+
+    async function syncProfile() {
+      try {
+        await adminApi.syncMe();
+
+        if (cancelled) return;
+
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ["admin", "check"] }),
+          qc.invalidateQueries({ queryKey: ["admin", "overview"] }),
+          qc.invalidateQueries({ queryKey: ["admin", "users"] }),
+          qc.invalidateQueries({ queryKey: ["/api/account/dashboard"] }),
+          qc.invalidateQueries({ queryKey: ["account", "dashboard"] }),
+          qc.invalidateQueries({ queryKey: ["account", "me"] }),
+        ]);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[SYNC ERROR]", err);
+        }
+      }
+    }
+
+    syncProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [qc, isLoaded, isSignedIn, user?.id]);
+
+  return null;
 }

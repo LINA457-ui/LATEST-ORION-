@@ -1,63 +1,81 @@
-/**
- * Clerk Frontend API Proxy Middleware
- *
- * Proxies Clerk Frontend API requests through your domain, enabling Clerk
- * authentication on custom domains and .replit.app deployments without
- * requiring CNAME DNS configuration.
- *
- * AUTH CONFIGURATION: To manage users, enable/disable login providers
- * (Google, GitHub, etc.), change app branding, or configure OAuth credentials,
- * use the Auth pane in the workspace toolbar. There is no external Clerk
- * dashboard — all auth configuration is done through the Auth pane.
- *
- * IMPORTANT:
- * - Only active in production (Clerk proxying doesn't work for dev instances)
- * - Must be mounted BEFORE express.json() middleware
- *
- * Usage in app.ts:
- *   import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
- *   app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
- */
-
 import { createProxyMiddleware } from "http-proxy-middleware";
-import type { RequestHandler } from "express";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 
 const CLERK_FAPI = "https://frontend-api.clerk.dev";
+
 export const CLERK_PROXY_PATH = "/api/__clerk";
 
+function noopMiddleware(
+  _req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
+  next();
+}
+
 export function clerkProxyMiddleware(): RequestHandler {
-  // Only run proxy in production — Clerk proxying doesn't work for dev instances
-  if (process.env.NODE_ENV !== "production") {
-    return (_req, _res, next) => next();
+  const isProduction = process.env.NODE_ENV === "production";
+  const secretKey = process.env.CLERK_SECRET_KEY;
+
+  // ✅ Local/dev mode: do nothing
+  if (!isProduction) {
+    return noopMiddleware;
   }
 
-  const secretKey = process.env.CLERK_SECRET_KEY;
+  // ✅ Production without Clerk secret: do nothing instead of crashing
   if (!secretKey) {
-    return (_req, _res, next) => next();
+    console.warn("[Clerk Proxy] CLERK_SECRET_KEY is missing. Clerk proxy disabled.");
+    return noopMiddleware;
   }
 
   return createProxyMiddleware({
     target: CLERK_FAPI,
     changeOrigin: true,
-    pathRewrite: (path: string) =>
-      path.replace(new RegExp(`^${CLERK_PROXY_PATH}`), ""),
+
+    pathRewrite: (path: string) => {
+      return path.replace(new RegExp(`^${CLERK_PROXY_PATH}`), "");
+    },
+
     on: {
       proxyReq: (proxyReq, req) => {
-        const protocol = req.headers["x-forwarded-proto"] || "https";
+        const protocol =
+          (req.headers["x-forwarded-proto"] as string) ||
+          req.protocol ||
+          "https";
+
         const host = req.headers.host || "";
         const proxyUrl = `${protocol}://${host}${CLERK_PROXY_PATH}`;
 
         proxyReq.setHeader("Clerk-Proxy-Url", proxyUrl);
         proxyReq.setHeader("Clerk-Secret-Key", secretKey);
 
-        const xff = req.headers["x-forwarded-for"];
+        const forwardedFor = req.headers["x-forwarded-for"];
+
         const clientIp =
-          (Array.isArray(xff) ? xff[0] : xff)?.split(",")[0]?.trim() ||
+          (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor)
+            ?.split(",")[0]
+            ?.trim() ||
           req.socket?.remoteAddress ||
           "";
+
         if (clientIp) {
           proxyReq.setHeader("X-Forwarded-For", clientIp);
         }
+      },
+
+      error: (err, _req, res) => {
+        console.error("[Clerk Proxy] Proxy error:", err);
+
+        const response = res as Response;
+
+        if (!response.headersSent) {
+          response.status(502).json({
+            error: "Clerk proxy failed",
+          });
+          return;
+        }
+
+        response.end();
       },
     },
   }) as RequestHandler;
