@@ -29,7 +29,31 @@ const router = Router();
 
 router.use(requireAuth);
 
-async function getAccountSnapshot(userId: string) {
+type AccountSnapshot = {
+  userId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  cashBalance: number;
+  totalEquity: number;
+  portfolioValue: number;
+  dayChange: number;
+  dayChangePercent: number;
+  buyingPower: number;
+  displayedTotalEquity: number;
+  displayedPortfolioValue: number;
+  displayedBuyingPower: number;
+  displayedDayChange: number;
+  displayedDayChangePercent: number;
+  overrides: {
+    equity: number | null;
+    marketValue: number | null;
+    buyingPower: number | null;
+    dayChange: number | null;
+    dayChangePercent: number | null;
+  };
+};
+
+async function getAccountSnapshot(userId: string): Promise<AccountSnapshot> {
   const account = await ensureAccount(userId);
 
   const userHoldings = await db
@@ -88,7 +112,7 @@ async function getAccountSnapshot(userId: string) {
 
   return {
     userId,
-    displayName: account.displayName,
+    displayName: account.displayName ?? null,
     avatarUrl: account.avatarUrl ?? null,
     cashBalance,
     totalEquity: totalEquityDisplay,
@@ -275,7 +299,7 @@ router.post("/transactions", async (req: Request, res: Response) => {
       description: description.trim(),
       amount: String(numericAmount),
       symbol: symbol ? symbol.toUpperCase().trim() : null,
-    } as any)
+    })
     .returning();
 
   const tx = inserted[0];
