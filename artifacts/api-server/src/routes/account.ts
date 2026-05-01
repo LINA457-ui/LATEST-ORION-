@@ -53,7 +53,7 @@ type AccountSnapshot = {
   };
 };
 
-async function getAccountSnapshot(userId: string): Promise<AccountSnapshot> {
+export async function getAccountSnapshot(userId: string): Promise<AccountSnapshot> {
   const account = await ensureAccount(userId);
 
   const userHoldings = await db

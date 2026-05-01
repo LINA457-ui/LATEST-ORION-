@@ -91,7 +91,7 @@ function HeroSection() {
         <div className="space-y-8">
           <div className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-4 py-2 text-sm text-muted-foreground shadow-sm backdrop-blur">
             <Sparkles className="h-4 w-4 text-primary" />
-            Smarter paper trading for modern investors
+            Smarter trading for modern investors
           </div>
 
           <div className="space-y-5">
@@ -103,7 +103,7 @@ function HeroSection() {
             </h1>
 
             <p className="max-w-xl text-lg leading-8 text-muted-foreground md:text-xl">
-              Orion gives you a premium investment dashboard, paper trading,
+              Orion gives you a premium investment dashboard, trading,
               portfolio intelligence, and AI-powered market guidance in one clean
               experience.
             </p>
@@ -264,9 +264,7 @@ function ImageStorySection() {
                   className="max-h-48 w-auto object-contain rounded-lg"
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Replace this block with your screenshot or mockup
-              </p>
+             
             </div>
           </div>
         </div>
@@ -307,7 +305,7 @@ function ImageStorySection() {
 function FeaturesSection() {
   const features = [
     {
-      title: "Real-time Paper Trading",
+      title: "Real-time Trading",
       desc: "Practice strategies with market-style data before risking real capital. Clean execution, clean feedback.",
       icon: LineChart,
     },
@@ -396,9 +394,7 @@ function PlatformShowcaseSection() {
                   className="max-h-48 w-auto object-contain rounded-lg"
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Replace with another product screenshot/mockup
-              </p>
+             
             </div>
           </div>
         </div>
