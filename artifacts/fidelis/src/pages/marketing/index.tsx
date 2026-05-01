@@ -231,11 +231,10 @@ function MarketPreviewSection() {
                 </div>
 
                 <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    item.change.startsWith("-")
-                      ? "bg-destructive/10 text-destructive"
-                      : "bg-green-500/10 text-green-600"
-                  }`}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${item.change.startsWith("-")
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-green-500/10 text-green-600"
+                    }`}
                 >
                   {item.change}
                 </span>
@@ -258,9 +257,13 @@ function ImageStorySection() {
           <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-muted via-background to-primary/20">
             <div className="text-center">
               <WalletCards className="mx-auto mb-4 h-12 w-12 text-primary" />
-              <p className="text-sm font-medium text-muted-foreground">
-                Add dashboard/product image here
-              </p>
+              <div className="w-full rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 p-4 flex items-center justify-center">
+                <img
+                  src="/towfiqu-barbhuiya-jpqyfK7GB4w-unsplash.jpg" // change this path
+                  alt="Dashboard preview"
+                  className="max-h-48 w-auto object-contain rounded-lg"
+                />
+              </div>
               <p className="text-xs text-muted-foreground">
                 Replace this block with your screenshot or mockup
               </p>
@@ -386,9 +389,13 @@ function PlatformShowcaseSection() {
           <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-primary/20 via-background to-muted">
             <div className="text-center">
               <LineChart className="mx-auto mb-4 h-12 w-12 text-primary" />
-              <p className="text-sm font-medium text-muted-foreground">
-                Add portfolio image here
-              </p>
+              <div className="w-full rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 p-4 flex items-center justify-center">
+                <img
+                  src="/markus-winkler-IrRbSND5EUc-unsplash.jpg" // change this path
+                  alt="Dashboard preview"
+                  className="max-h-48 w-auto object-contain rounded-lg"
+                />
+              </div>
               <p className="text-xs text-muted-foreground">
                 Replace with another product screenshot/mockup
               </p>

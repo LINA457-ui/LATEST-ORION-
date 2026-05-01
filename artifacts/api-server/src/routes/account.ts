@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Response } from "express";
+import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { accounts, holdings, orders, transactions, watchlist } from "@workspace/db/schema";
 import { and, desc, eq } from "drizzle-orm";
@@ -20,7 +20,7 @@ import {
   type Range,
 } from "../lib/marketData";
 
-const router: IRouter = Router();
+const router = Router();
 router.use(requireAuth);
 
 async function getAccountSnapshot(userId: string) {
@@ -110,13 +110,13 @@ async function getAccountSnapshot(userId: string) {
   };
 }
 
-router.get("/me", async (req, res: Response) => {
+router.get("/me", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
   const snapshot = await getAccountSnapshot(userId);
   res.json(snapshot);
 });
 
-router.post("/sync", async (req, res: Response) => {
+router.post("/sync", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
   const { email, displayName } = (req.body ?? {}) as {
     email?: string;
@@ -129,7 +129,7 @@ router.post("/sync", async (req, res: Response) => {
 // Upload (or clear) the user's avatar. The client should resize/compress to
 // a small JPEG and send a data URL — we cap the payload at ~600KB so bulk
 // uploads cannot bloat the database.
-router.post("/avatar", async (req, res: Response) => {
+router.post("/avatar", async (req: Request, res: Response)=> {
   const userId = userIdOf(req);
   const { avatarUrl } = (req.body ?? {}) as { avatarUrl?: string | null };
   if (avatarUrl === null || avatarUrl === "") {
@@ -166,7 +166,7 @@ router.post("/avatar", async (req, res: Response) => {
   res.json({ ok: true, avatarUrl });
 });
 
-router.get("/performance", async (req, res: Response) => {
+router.get("/performance", async (req: Request, res: Response)=> {
   const userId = userIdOf(req);
   const parsed = GetAccountPerformanceQueryParams.parse(req.query);
   const range = (parsed.range ?? "1M") as Range;
@@ -185,7 +185,7 @@ router.get("/performance", async (req, res: Response) => {
   });
 });
 
-router.get("/transactions", async (req, res: Response) => {
+router.get("/transactions", async (req: Request, res: Response)=> {
   const userId = userIdOf(req);
   const rows = await db
     .select()
@@ -205,7 +205,7 @@ router.get("/transactions", async (req, res: Response) => {
   );
 });
 
-router.get("/watchlist", async (req, res: Response) => {
+router.get("/watchlist", async (req: Request, res: Response)=> {
   const userId = userIdOf(req);
   const rows = await db
     .select()
@@ -219,7 +219,7 @@ router.get("/watchlist", async (req, res: Response) => {
   res.json(quotes);
 });
 
-router.post("/watchlist", async (req, res: Response) => {
+router.post("/watchlist", async (req: Request, res: Response)=> {
   const userId = userIdOf(req);
   const body = AddToWatchlistBody.parse(req.body);
   const symbol = body.symbol.toUpperCase();
@@ -236,7 +236,7 @@ router.post("/watchlist", async (req, res: Response) => {
   res.status(201).json(quote);
 });
 
-router.delete("/watchlist/:symbol", async (req, res: Response) => {
+router.delete("/watchlist/:symbol", async (req: Request, res: Response)=> {
   const userId = userIdOf(req);
   const params = RemoveFromWatchlistParams.parse(req.params);
   await db
@@ -247,7 +247,7 @@ router.delete("/watchlist/:symbol", async (req, res: Response) => {
   res.status(204).end();
 });
 
-router.get("/dashboard", async (req, res: Response) => {
+router.get("/dashboard", async(req: Request, res: Response)=> {
   const userId = userIdOf(req);
   const snapshot = await getAccountSnapshot(userId);
   const curve = getEquityCurve(snapshot.totalEquity, "1M");
