@@ -29,7 +29,7 @@ const router = Router();
 
 router.use(requireAuth);
 
-export type AccountSnapshot = {
+type AccountSnapshot = {
   userId: string;
   displayName: string | null;
   avatarUrl: string | null;
@@ -506,4 +506,3 @@ router.get("/dashboard", async (req: Request, res: Response) => {
 });
 
 export default router;
-export { getAccountSnapshot };
