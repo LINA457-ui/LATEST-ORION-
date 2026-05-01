@@ -123,7 +123,7 @@ export const adminApi = {
       }
     ),
 
-  createTransaction: (userId: string, data: any) =>
+   createTransaction: (userId: string, data: any) =>
     request(`/api/admin/users/${encodeURIComponent(userId)}/transactions`, {
       method: "POST",
       body: JSON.stringify(data),
@@ -132,6 +132,24 @@ export const adminApi = {
   deleteTransaction: (id: number) =>
     request(`/api/admin/transactions/${id}`, {
       method: "DELETE",
+    }),
+
+  deleteUser: (userId: string) =>
+    request(`/api/admin/users/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }),
+
+  uploadAvatar: (formData: FormData) =>
+    fetch(`${BASE}/api/account/avatar`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    }).then(async (res) => {
+      if (!res.ok) {
+        throw new Error("Failed to upload avatar");
+      }
+
+      return res.json();
     }),
 
   transactions: () => request<any[]>("/api/admin/transactions"),
