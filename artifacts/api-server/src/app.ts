@@ -5,10 +5,13 @@ import express, {
   type Response,
 } from "express";
 import cors from "cors";
-import pinoHttp from "pino-http";
+import { createRequire } from "node:module";
 
 import router from "./routes";
 import { logger } from "./lib/logger";
+
+const require = createRequire(import.meta.url);
+const pinoHttp = require("pino-http") as any;
 
 const app: Express = express();
 
