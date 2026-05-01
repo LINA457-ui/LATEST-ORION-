@@ -1,6 +1,12 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { accounts, holdings, orders, transactions, watchlist } from "@workspace/db/schema";
+import {
+  accounts,
+  holdings,
+  orders,
+  transactions,
+  watchlist,
+} from "@workspace/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import {
   AddToWatchlistBody,
@@ -9,7 +15,6 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, ensureAccount, userIdOf } from "../lib/auth";
 import {
-  getAllQuotes,
   getEquityCurve,
   getIndices,
   getMeta,
@@ -21,10 +26,12 @@ import {
 } from "../lib/marketData";
 
 const router = Router();
+
 router.use(requireAuth);
 
 async function getAccountSnapshot(userId: string) {
   const account = await ensureAccount(userId);
+
   const userHoldings = await db
     .select()
     .from(holdings)
@@ -32,39 +39,49 @@ async function getAccountSnapshot(userId: string) {
 
   let portfolioValue = 0;
   let dayChange = 0;
-  for (const h of userHoldings) {
-    const q = getQuote(h.symbol);
-    if (!q) continue;
-    const qty = Number(h.quantity);
-    portfolioValue += qty * q.price;
-    dayChange += qty * q.change;
-  }
-  const cashBalance = Number(account.cashBalance);
-  const computedPortfolioValue = +portfolioValue.toFixed(2);
-  const computedTotalEquity = +(portfolioValue + cashBalance).toFixed(2);
-  const computedDayChange = +dayChange.toFixed(2);
-  const previousValue = computedTotalEquity - computedDayChange;
-  const computedDayChangePercent =
-    previousValue > 0 ? +((computedDayChange / previousValue) * 100).toFixed(2) : 0;
 
-  // Admin-set display overrides (when present) take precedence over computed
-  // figures so the dashboard stays stable regardless of market simulator state.
+  for (const h of userHoldings) {
+    const quote = getQuote(h.symbol);
+    if (!quote) continue;
+
+    const qty = Number(h.quantity);
+    portfolioValue += qty * quote.price;
+    dayChange += qty * quote.change;
+  }
+
+  const cashBalance = Number(account.cashBalance);
+
+  const computedPortfolioValue = Number(portfolioValue.toFixed(2));
+  const computedTotalEquity = Number((portfolioValue + cashBalance).toFixed(2));
+  const computedDayChange = Number(dayChange.toFixed(2));
+
+  const previousValue = computedTotalEquity - computedDayChange;
+
+  const computedDayChangePercent =
+    previousValue > 0
+      ? Number(((computedDayChange / previousValue) * 100).toFixed(2))
+      : 0;
+
   const portfolioValueDisplay =
     account.marketValueOverride != null
       ? Number(account.marketValueOverride)
       : computedPortfolioValue;
+
   const totalEquityDisplay =
     account.equityOverride != null
       ? Number(account.equityOverride)
       : computedTotalEquity;
+
   const buyingPowerDisplay =
     account.buyingPowerOverride != null
       ? Number(account.buyingPowerOverride)
       : cashBalance;
+
   const dayChangeDisplay =
     account.dayChangeOverride != null
       ? Number(account.dayChangeOverride)
       : computedDayChange;
+
   const dayChangePercentDisplay =
     account.dayChangePercentOverride != null
       ? Number(account.dayChangePercentOverride)
@@ -74,19 +91,20 @@ async function getAccountSnapshot(userId: string) {
     userId,
     displayName: account.displayName,
     avatarUrl: account.avatarUrl ?? null,
+
     cashBalance,
     totalEquity: totalEquityDisplay,
     portfolioValue: portfolioValueDisplay,
     dayChange: dayChangeDisplay,
     dayChangePercent: dayChangePercentDisplay,
     buyingPower: buyingPowerDisplay,
-    // Aliases — the admin endpoint and some clients prefer the `displayed*`
-    // naming. Both names resolve to the same override-aware value.
+
     displayedTotalEquity: totalEquityDisplay,
     displayedPortfolioValue: portfolioValueDisplay,
     displayedBuyingPower: buyingPowerDisplay,
     displayedDayChange: dayChangeDisplay,
     displayedDayChangePercent: dayChangePercentDisplay,
+
     overrides: {
       equity:
         account.equityOverride != null ? Number(account.equityOverride) : null,
@@ -118,63 +136,84 @@ router.get("/me", async (req: Request, res: Response) => {
 
 router.post("/sync", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
+
   const { email, displayName } = (req.body ?? {}) as {
     email?: string;
     displayName?: string;
   };
+
   await ensureAccount(userId, displayName, email);
-  res.json({ ok: true });
+
+  res.json({
+    ok: true,
+    userId,
+  });
 });
 
-// Upload (or clear) the user's avatar. The client should resize/compress to
-// a small JPEG and send a data URL — we cap the payload at ~600KB so bulk
-// uploads cannot bloat the database.
-router.post("/avatar", async (req: Request, res: Response)=> {
+router.post("/avatar", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
-  const { avatarUrl } = (req.body ?? {}) as { avatarUrl?: string | null };
+
+  const { avatarUrl } = (req.body ?? {}) as {
+    avatarUrl?: string | null;
+  };
+
   if (avatarUrl === null || avatarUrl === "") {
     await db
       .update(accounts)
       .set({ avatarUrl: null })
       .where(eq(accounts.userId, userId));
+
     res.json({ ok: true, avatarUrl: null });
     return;
   }
+
   if (typeof avatarUrl !== "string") {
     res.status(400).json({ error: "avatarUrl must be a string or null" });
     return;
   }
-  // Restrict to base64-encoded JPEG / PNG / WEBP data URLs. Reject any other
-  // schemes (incl. http(s), javascript:, data:text/html, etc.) so we don't
-  // store anything that the browser might render unexpectedly.
+
   const dataUrlRe = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+
   if (!dataUrlRe.test(avatarUrl)) {
     res.status(400).json({
       error: "Avatar must be a base64-encoded JPEG, PNG, or WEBP data URL.",
     });
     return;
   }
+
   if (avatarUrl.length > 600_000) {
-    res.status(413).json({ error: "Image too large. Please upload a smaller picture." });
+    res.status(413).json({
+      error: "Image too large. Please upload a smaller picture.",
+    });
     return;
   }
+
   await ensureAccount(userId);
+
   await db
     .update(accounts)
     .set({ avatarUrl })
     .where(eq(accounts.userId, userId));
+
   res.json({ ok: true, avatarUrl });
 });
 
-router.get("/performance", async (req: Request, res: Response)=> {
+router.get("/performance", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
+
   const parsed = GetAccountPerformanceQueryParams.parse(req.query);
   const range = (parsed.range ?? "1M") as Range;
-  const snap = await getAccountSnapshot(userId);
-  const curve = getEquityCurve(snap.totalEquity, range);
-  const change = +(curve.endValue - curve.startValue).toFixed(2);
+
+  const snapshot = await getAccountSnapshot(userId);
+  const curve = getEquityCurve(snapshot.totalEquity, range);
+
+  const change = Number((curve.endValue - curve.startValue).toFixed(2));
+
   const changePercent =
-    curve.startValue > 0 ? +((change / curve.startValue) * 100).toFixed(2) : 0;
+    curve.startValue > 0
+      ? Number(((change / curve.startValue) * 100).toFixed(2))
+      : 0;
+
   res.json({
     range,
     points: curve.points,
@@ -185,119 +224,208 @@ router.get("/performance", async (req: Request, res: Response)=> {
   });
 });
 
-router.get("/transactions", async (req: Request, res: Response)=> {
+router.get("/transactions", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
+
   const rows = await db
     .select()
     .from(transactions)
     .where(eq(transactions.userId, userId))
     .orderBy(desc(transactions.createdAt))
     .limit(100);
+
   res.json(
     rows.map((t) => ({
       id: t.id,
       type: t.type,
       description: t.description,
       amount: Number(t.amount),
-      symbol: t.symbol ?? undefined,
+      symbol: t.symbol ?? null,
       createdAt: t.createdAt.toISOString(),
     })),
   );
 });
 
-router.get("/watchlist", async (req: Request, res: Response)=> {
+router.post("/transactions", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
+
+  const { type, description, amount, symbol, createdAt } = (req.body ?? {}) as {
+    type?: string;
+    description?: string;
+    amount?: number | string;
+    symbol?: string | null;
+    createdAt?: string;
+  };
+
+  if (!type || typeof type !== "string") {
+    res.status(400).json({ error: "Transaction type is required." });
+    return;
+  }
+
+  if (!description || typeof description !== "string") {
+    res.status(400).json({ error: "Transaction description is required." });
+    return;
+  }
+
+  const numericAmount = Number(amount);
+
+  if (!Number.isFinite(numericAmount)) {
+    res.status(400).json({ error: "Transaction amount must be a valid number." });
+    return;
+  }
+
+  const inserted = await db
+    .insert(transactions)
+    .values({
+      userId,
+      type: type.trim(),
+      description: description.trim(),
+      amount: numericAmount.toString(),
+      symbol: symbol ? symbol.toUpperCase().trim() : null,
+      createdAt: createdAt ? new Date(createdAt) : new Date(),
+    })
+    .returning();
+
+  const tx = inserted[0];
+
+  res.status(201).json({
+    id: tx.id,
+    type: tx.type,
+    description: tx.description,
+    amount: Number(tx.amount),
+    symbol: tx.symbol ?? null,
+    createdAt: tx.createdAt.toISOString(),
+  });
+});
+
+router.get("/watchlist", async (req: Request, res: Response) => {
+  const userId = userIdOf(req);
+
   const rows = await db
     .select()
     .from(watchlist)
     .where(eq(watchlist.userId, userId))
     .orderBy(desc(watchlist.createdAt));
-  const symbols = rows.length ? rows.map((r) => r.symbol) : POPULAR_SYMBOLS.slice(0, 6);
+
+  const symbols = rows.length
+    ? rows.map((row) => row.symbol)
+    : POPULAR_SYMBOLS.slice(0, 6);
+
   const quotes = symbols
-    .map((s) => getQuote(s))
-    .filter((q): q is NonNullable<typeof q> => Boolean(q));
+    .map((symbol) => getQuote(symbol))
+    .filter((quote): quote is NonNullable<typeof quote> => Boolean(quote));
+
   res.json(quotes);
 });
 
-router.post("/watchlist", async (req: Request, res: Response)=> {
+router.post("/watchlist", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
+
   const body = AddToWatchlistBody.parse(req.body);
   const symbol = body.symbol.toUpperCase();
+
   const meta = getMeta(symbol);
+
   if (!meta) {
     res.status(400).json({ error: "Unknown symbol" });
     return;
   }
+
   await db
     .insert(watchlist)
     .values({ userId, symbol })
     .onConflictDoNothing();
+
   const quote = getQuote(symbol);
+
   res.status(201).json(quote);
 });
 
-router.delete("/watchlist/:symbol", async (req: Request, res: Response)=> {
+router.delete("/watchlist/:symbol", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
+
   const params = RemoveFromWatchlistParams.parse(req.params);
+  const symbol = params.symbol.toUpperCase();
+
   await db
     .delete(watchlist)
-    .where(
-      and(eq(watchlist.userId, userId), eq(watchlist.symbol, params.symbol.toUpperCase())),
-    );
+    .where(and(eq(watchlist.userId, userId), eq(watchlist.symbol, symbol)));
+
   res.status(204).end();
 });
 
-router.get("/dashboard", async(req: Request, res: Response)=> {
+router.get("/dashboard", async (req: Request, res: Response) => {
   const userId = userIdOf(req);
+
   const snapshot = await getAccountSnapshot(userId);
+
   const curve = getEquityCurve(snapshot.totalEquity, "1M");
-  const change = +(curve.endValue - curve.startValue).toFixed(2);
+
+  const change = Number((curve.endValue - curve.startValue).toFixed(2));
+
   const changePercent =
-    curve.startValue > 0 ? +((change / curve.startValue) * 100).toFixed(2) : 0;
+    curve.startValue > 0
+      ? Number(((change / curve.startValue) * 100).toFixed(2))
+      : 0;
 
   const userHoldings = await db
     .select()
     .from(holdings)
     .where(eq(holdings.userId, userId));
+
   const positions = userHoldings
-    .map((h) => {
-      const q = getQuote(h.symbol);
-      const meta = getMeta(h.symbol);
-      if (!q || !meta) return null;
-      const qty = Number(h.quantity);
-      const avg = Number(h.averageCost);
-      const marketValue = +(qty * q.price).toFixed(2);
-      const unrealizedPnl = +(qty * (q.price - avg)).toFixed(2);
+    .map((holding) => {
+      const quote = getQuote(holding.symbol);
+      const meta = getMeta(holding.symbol);
+
+      if (!quote || !meta) return null;
+
+      const quantity = Number(holding.quantity);
+      const averageCost = Number(holding.averageCost);
+
+      const marketValue = Number((quantity * quote.price).toFixed(2));
+
+      const unrealizedPnl = Number(
+        (quantity * (quote.price - averageCost)).toFixed(2),
+      );
+
       const unrealizedPnlPercent =
-        avg > 0 ? +(((q.price - avg) / avg) * 100).toFixed(2) : 0;
+        averageCost > 0
+          ? Number((((quote.price - averageCost) / averageCost) * 100).toFixed(2))
+          : 0;
+
       return {
-        id: h.id,
-        symbol: h.symbol,
+        id: holding.id,
+        symbol: holding.symbol,
         name: meta.name,
         sector: meta.sector,
-        quantity: qty,
-        averageCost: avg,
-        currentPrice: q.price,
+        quantity,
+        averageCost,
+        currentPrice: quote.price,
         marketValue,
         unrealizedPnl,
         unrealizedPnlPercent,
-        dayChange: +(qty * q.change).toFixed(2),
-        dayChangePercent: q.changePercent,
+        dayChange: Number((quantity * quote.change).toFixed(2)),
+        dayChangePercent: quote.changePercent,
       };
     })
-    .filter((p): p is NonNullable<typeof p> => Boolean(p));
+    .filter((position): position is NonNullable<typeof position> =>
+      Boolean(position),
+    );
 
   const watchRows = await db
     .select()
     .from(watchlist)
     .where(eq(watchlist.userId, userId))
     .orderBy(desc(watchlist.createdAt));
+
   const watchSymbols = watchRows.length
-    ? watchRows.map((r) => r.symbol)
+    ? watchRows.map((row) => row.symbol)
     : POPULAR_SYMBOLS.slice(0, 6);
+
   const watchQuotes = watchSymbols
-    .map((s) => getQuote(s))
-    .filter((q): q is NonNullable<typeof q> => Boolean(q));
+    .map((symbol) => getQuote(symbol))
+    .filter((quote): quote is NonNullable<typeof quote> => Boolean(quote));
 
   const recentOrders = (
     await db
@@ -306,18 +434,19 @@ router.get("/dashboard", async(req: Request, res: Response)=> {
       .where(eq(orders.userId, userId))
       .orderBy(desc(orders.createdAt))
       .limit(8)
-  ).map((o) => {
-    const meta = getMeta(o.symbol);
+  ).map((order) => {
+    const meta = getMeta(order.symbol);
+
     return {
-      id: o.id,
-      symbol: o.symbol,
-      name: meta?.name ?? o.symbol,
-      side: o.side as "buy" | "sell",
-      quantity: Number(o.quantity),
-      price: Number(o.price),
-      total: Number(o.total),
-      status: o.status as "filled" | "pending" | "rejected",
-      createdAt: o.createdAt.toISOString(),
+      id: order.id,
+      symbol: order.symbol,
+      name: meta?.name ?? order.symbol,
+      side: order.side as "buy" | "sell",
+      quantity: Number(order.quantity),
+      price: Number(order.price),
+      total: Number(order.total),
+      status: order.status as "filled" | "pending" | "rejected",
+      createdAt: order.createdAt.toISOString(),
     };
   });
 
@@ -328,13 +457,13 @@ router.get("/dashboard", async(req: Request, res: Response)=> {
       .where(eq(transactions.userId, userId))
       .orderBy(desc(transactions.createdAt))
       .limit(8)
-  ).map((t) => ({
-    id: t.id,
-    type: t.type,
-    description: t.description,
-    amount: Number(t.amount),
-    symbol: t.symbol ?? undefined,
-    createdAt: t.createdAt.toISOString(),
+  ).map((transaction) => ({
+    id: transaction.id,
+    type: transaction.type,
+    description: transaction.description,
+    amount: Number(transaction.amount),
+    symbol: transaction.symbol ?? null,
+    createdAt: transaction.createdAt.toISOString(),
   }));
 
   res.json({
