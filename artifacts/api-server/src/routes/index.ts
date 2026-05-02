@@ -1,12 +1,13 @@
 import { Router, type IRouter } from "express";
-import healthRouter from "./health";
-import accountRouter from "./account";
-import marketRouter from "./market";
-import portfolioRouter from "./portfolio";
-import tradingRouter from "./trading";
-import paymentsRouter from "./payments";
-import openaiRouter from "./openai";
-import adminRouter from "./admin";
+
+import healthRouter from "./health.js";
+import accountRouter from "./account.js";
+import marketRouter from "./market.js";
+import portfolioRouter from "./portfolio.js";
+import tradingRouter from "./trading.js";
+import paymentsRouter from "./payments.js";
+import openaiRouter from "./openai.js";
+import adminRouter from "./admin.js";
 
 const router: IRouter = Router();
 

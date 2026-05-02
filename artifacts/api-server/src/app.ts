@@ -7,6 +7,7 @@ import express, {
 import cors, { type CorsOptions } from "cors";
 import { createRequire } from "node:module";
 import router from "./routes/index.js";
+
 import { logger } from "./lib/logger";
 
 const require = createRequire(import.meta.url);
