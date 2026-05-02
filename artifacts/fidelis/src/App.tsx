@@ -41,8 +41,11 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Marketing} />
-      <Route path="/sign-in/*?" component={SignIn} />
-      <Route path="/sign-up/*?" component={SignUp} />
+      <Route path="/sign-in/:rest*" component={SignIn} />
+<Route path="/sign-in" component={SignIn} />
+
+<Route path="/sign-up/:rest*" component={SignUp} />
+<Route path="/sign-up" component={SignUp} />
       
       <Route path="/dashboard"><ProtectedRoute><Shell><Dashboard /></Shell></ProtectedRoute></Route>
       <Route path="/portfolio"><ProtectedRoute><Shell><Portfolio /></Shell></ProtectedRoute></Route>
@@ -73,7 +76,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+         <WouterRouter base={(import.meta.env.BASE_URL || "/").replace(/\/$/, "")}>
             <ProfileSyncer />
             <Router />
           </WouterRouter>
