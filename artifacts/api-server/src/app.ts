@@ -73,7 +73,7 @@ app.use(
 
 app.use(cors(corsOptions));
 
-app.use((req: Request, res: Response, next: NextFunction) => {
+app.use((req: Request, res: Response, next: NextFunction): void => {
   if (req.method === "OPTIONS") {
     const origin = req.headers.origin;
 
@@ -92,12 +92,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       "Content-Type, Authorization, X-Admin-Pin-Token, x-admin-pin-token",
     );
 
-    return res.sendStatus(204);
+    res.sendStatus(204);
+    return;
   }
 
   next();
 });
-
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
