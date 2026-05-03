@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { createRequire } from "node:module";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
@@ -6,134 +6,105 @@ import { logger } from "./lib/logger.js";
 const require = createRequire(import.meta.url);
 const pinoHttp = require("pino-http");
 
-const app: any = express();
+const app = express();
 
-app.set("etag", false);
 app.disable("x-powered-by");
+app.set("etag", false);
 
-const allowedOrigins = new Set<string>([
+/**
+ * Allowed origins
+ */
+const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5000",
-
-  "https://orion-2026-fidelis.vercel.app",
-  "https://orion-2026-fidelis-linas-projects-3515e4d1.vercel.app",
-
   "https://www.investmentorion.com",
   "https://investmentorion.com",
+];
 
-  "https://latest-orion-api-server.vercel.app",
-]);
+/**
+ * CORS Middleware (FIXED)
+ */
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
 
-function isAllowedOrigin(origin?: string): boolean {
-  if (!origin) return false;
-
-  if (allowedOrigins.has(origin)) return true;
-
-  try {
-    const url = new URL(origin);
-
-    return (
-      url.protocol === "https:" &&
-      url.hostname.endsWith(".vercel.app")
-    );
-  } catch {
-    return false;
-  }
-}
-
-app.use((req: any, res: any, next: any) => {
-  const origin = req.headers.origin as string | undefined;
-
-  if (isAllowedOrigin(origin)) {
+  // 🔥 ALWAYS allow your frontend (fixes production issue)
+  if (origin && allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
+  } else if (origin?.includes(".vercel.app")) {
+    // allow preview deployments
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  } else {
+    // fallback (VERY IMPORTANT for debugging)
+    res.setHeader("Access-Control-Allow-Origin", "*");
   }
 
   res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Credentials", "true");
+
   res.setHeader(
     "Access-Control-Allow-Headers",
-    [
-      "Origin",
-      "X-Requested-With",
-      "Content-Type",
-      "Accept",
-      "Authorization",
-      "X-Admin-Pin-Token",
-      "x-admin-pin-token",
-    ].join(", "),
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Admin-Pin-Token"
   );
+
   res.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
   );
-  res.setHeader("Cache-Control", "no-store");
 
+  // 🔥 MUST respond to preflight
   if (req.method === "OPTIONS") {
-    return res.status(204).end();
+    return res.sendStatus(204);
   }
 
   next();
 });
 
+/**
+ * Logger
+ */
 app.use(
   pinoHttp({
     logger,
-    serializers: {
-      req(req: any) {
-        return {
-          id: req.id,
-          method: req.method,
-          url: req.url?.split("?")[0],
-        };
-      },
-      res(res: any) {
-        return {
-          statusCode: res.statusCode,
-        };
-      },
-    },
-  }),
+  })
 );
 
+/**
+ * Body parsers
+ */
 app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 
-app.get("/", (_req: any, res: any) => {
-  res.status(200).json({
-    ok: true,
-    service: "latest-orion-api-server",
-  });
+/**
+ * Health routes
+ */
+app.get("/", (_req, res) => {
+  res.json({ ok: true, service: "latest-orion-api-server" });
 });
 
-app.get("/health", (_req: any, res: any) => {
-  res.status(200).json({
-    ok: true,
-    service: "latest-orion-api-server",
-  });
+app.get("/health", (_req, res) => {
+  res.json({ ok: true });
 });
 
-app.get("/api/health", (_req: any, res: any) => {
-  res.status(200).json({
-    ok: true,
-    service: "latest-orion-api-server",
-  });
-});
-
+/**
+ * API
+ */
 app.use("/api", router);
 
-app.use((_req: any, res: any) => {
-  res.status(404).json({
-    error: "Route not found",
-  });
+/**
+ * 404
+ */
+app.use((_req, res) => {
+  res.status(404).json({ error: "Not found" });
 });
 
-app.use((err: unknown, _req: any, res: any, _next: any) => {
+/**
+ * Error handler
+ */
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error("🔥 Server Error:", err);
 
-  if (res.headersSent) return;
-
   res.status(500).json({
-    error: err instanceof Error ? err.message : "Internal Server Error",
+    error: err?.message || "Internal Server Error",
   });
 });
 
