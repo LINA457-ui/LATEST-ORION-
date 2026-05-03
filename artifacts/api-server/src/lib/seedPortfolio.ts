@@ -242,7 +242,7 @@ export async function createAccountWithSeed(
   userId: string,
   displayName: string,
 ) {
-  return db.transaction(async (tx) => {
+ return db.transaction(async (tx: any) => {
     const existing = await tx
       .select()
       .from(accounts)

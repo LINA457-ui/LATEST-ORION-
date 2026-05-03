@@ -351,7 +351,9 @@ router.get("/watchlist", async (req: Request, res: Response) => {
 
   const quotes = symbols
     .map((symbol: string) => getQuote(symbol))
-    .filter((quote): quote is NonNullable<typeof quote> => Boolean(quote));
+   .filter((quote: ReturnType<typeof getQuote>): quote is NonNullable<ReturnType<typeof getQuote>> =>
+  Boolean(quote),
+);
 
   res.json(quotes);
 });
@@ -447,7 +449,9 @@ router.get("/dashboard", async (req: Request, res: Response) => {
         dayChangePercent: quote.changePercent,
       };
     })
-    .filter((position): position is Position => Boolean(position));
+   .filter((position: Position | null): position is Position =>
+  Boolean(position),
+);
 
   const watchRows = await db
     .select()
@@ -461,7 +465,9 @@ router.get("/dashboard", async (req: Request, res: Response) => {
 
   const watchQuotes = watchSymbols
     .map((symbol: string) => getQuote(symbol))
-    .filter((quote): quote is NonNullable<typeof quote> => Boolean(quote));
+    .filter((quote: ReturnType<typeof getQuote>): quote is NonNullable<ReturnType<typeof getQuote>> =>
+  Boolean(quote),
+);
 
   const recentOrderRows = await db
     .select()
