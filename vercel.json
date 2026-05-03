@@ -5,7 +5,7 @@
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "artifacts/api-server/dist/index.js"
+      "dest": "index.js"
     }
   ]
 }
