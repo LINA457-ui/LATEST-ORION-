@@ -2,19 +2,16 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import app from "./app.js";
-import { logger } from "./lib/logger.js";
 import { ensureDefaultPin } from "./lib/adminPin.js";
 
-const port = Number(process.env.PORT || 5000);
+let pinSeedStarted = false;
 
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${process.env.PORT}"`);
-}
-
-app.listen(port, "0.0.0.0", () => {
-  logger.info({ port }, "Server listening");
+if (!pinSeedStarted) {
+  pinSeedStarted = true;
 
   ensureDefaultPin().catch((err: unknown) => {
-    logger.error({ err }, "Failed to seed default admin PIN");
+    console.error("Failed to seed default admin PIN", err);
   });
-});
+}
+
+export default app;
