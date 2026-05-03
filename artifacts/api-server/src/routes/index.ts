@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import express from "express";
 
 import healthRouter from "./health.js";
 import accountRouter from "./account.js";
@@ -9,7 +9,7 @@ import paymentsRouter from "./payments.js";
 import openaiRouter from "./openai.js";
 import adminRouter from "./admin.js";
 
-const router: IRouter = Router();
+const router: any = express.Router();
 
 router.use(healthRouter);
 router.use("/account", accountRouter);
