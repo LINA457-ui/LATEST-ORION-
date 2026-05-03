@@ -11,7 +11,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${process.env.PORT}"`);
 }
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
   logger.info({ port }, "Server listening");
 
   ensureDefaultPin().catch((err: unknown) => {
