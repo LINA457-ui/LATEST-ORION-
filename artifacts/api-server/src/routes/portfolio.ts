@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Response } from "express";
-import { db } from "../../../../lib/db/dist/index.js";
-import { holdings } from "../../../../lib/db/dist/schema/index.js";
+import { db } from "../../../../lib/db/src/index.js";
+import { holdings } from "../../../../lib/db/src/schema/index.js";
 import { eq } from "drizzle-orm";
 import { requireAuth, userIdOf } from "../lib/auth";
 import { getMeta, getQuote } from "../lib/marketData";

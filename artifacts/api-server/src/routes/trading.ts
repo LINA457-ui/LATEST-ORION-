@@ -4,14 +4,17 @@ import {
   type Request,
   type Response,
 } from "express";
-import { db } from "../../../../lib/db/dist/index.js";
+
+import { db } from "../../../../lib/db/src/index.js";
 import {
   accounts,
   holdings,
   orders,
   transactions,
-} from "../../../../lib/db/dist/schema/index.js";
-import { PlaceOrderBody } from "../../../../lib/api-zod/dist/index.js";
+} from "../../../../lib/db/src/schema/index.js";
+
+import { PlaceOrderBody } from "../../../../lib/api-zod/src/index.js";
+
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { requireAuth, ensureAccount, userIdOf } from "../lib/auth";
@@ -182,9 +185,8 @@ router.post("/orders", async (req: Request, res: Response) => {
   await db.insert(transactions).values({
     userId,
     type: body.side,
-    description: `${
-      body.side === "buy" ? "Bought" : "Sold"
-    } ${body.quantity} ${symbol} @ $${price.toFixed(2)}`,
+    description: `${body.side === "buy" ? "Bought" : "Sold"
+      } ${body.quantity} ${symbol} @ $${price.toFixed(2)}`,
     amount: (body.side === "buy" ? -total : total).toFixed(2),
     symbol,
   });

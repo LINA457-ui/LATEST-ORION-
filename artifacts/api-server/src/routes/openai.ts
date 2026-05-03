@@ -4,15 +4,19 @@ import {
   type Request,
   type Response,
 } from "express";
-import { db } from "../../../../lib/db/dist/index.js";
+
+import { db } from "../../../../lib/db/src/index.js";
 import {
   conversations,
   messages,
   holdings,
   watchlist,
-} from "../../../../lib/db/dist/schema/index.js";
+} from "../../../../lib/db/src/schema/index.js";
+
 import { and, asc, desc, eq } from "drizzle-orm";
-import { openai } from "@workspace/integrations-openai-ai-server";
+
+import { openai } from "../../../../lib/integrations-openai-ai-server/src/index.js";
+
 import {
   CreateOpenaiConversationBody,
   DeleteOpenaiConversationParams,
@@ -20,7 +24,8 @@ import {
   ListOpenaiMessagesParams,
   SendOpenaiMessageBody,
   SendOpenaiMessageParams,
-} from "@workspace/api-zod";
+} from "../../../../lib/api-zod/src/index.js";
+
 import { requireAuth, userIdOf } from "../lib/auth";
 import { getAccountSnapshot } from "./account";
 import { getQuote } from "../lib/marketData";

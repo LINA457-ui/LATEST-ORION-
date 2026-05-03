@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "../..",
     "types": ["node"],
 
     "declaration": false,
@@ -16,6 +16,11 @@
 
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "../../lib/db/src/**/*.ts",
+    "../../lib/api-zod/src/**/*.ts",
+    "../../lib/integrations-openai-ai-server/src/**/*.ts"
+  ],
   "exclude": ["dist", "node_modules"]
 }

@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
-import { db, accounts } from "@workspace/db";
+import { db } from "../../../../lib/db/src/index.js";
+import { accounts } from "../../../../lib/db/src/schema/index.js";
 import { eq, sql } from "drizzle-orm";
 import { createAccountWithSeed } from "./seedPortfolio.js";
 
