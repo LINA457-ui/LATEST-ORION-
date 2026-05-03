@@ -1,11 +1,11 @@
-import express, { Request, Response, NextFunction } from "express";
+import express from "express";
 import { createRequire } from "node:module";
 import { logger } from "./lib/logger.js";
 
 const require = createRequire(import.meta.url);
 const pinoHttp = require("pino-http");
 
-const app = express();
+const app: any = express();
 
 app.disable("x-powered-by");
 app.set("etag", false);
@@ -20,30 +20,25 @@ const allowedOrigins = new Set<string>([
 
 function isAllowedOrigin(origin?: string): boolean {
   if (!origin) return false;
-
   if (allowedOrigins.has(origin)) return true;
 
   try {
     const url = new URL(origin);
-
-    return (
-      url.protocol === "https:" &&
-      url.hostname.endsWith(".vercel.app")
-    );
+    return url.protocol === "https:" && url.hostname.endsWith(".vercel.app");
   } catch {
     return false;
   }
 }
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin;
+app.use((req: any, res: any, next: any) => {
+  const origin = req.headers?.origin as string | undefined;
 
   res.setHeader("X-Debug-Cors", "working");
   res.setHeader("Vary", "Origin");
   res.setHeader("Cache-Control", "no-store");
 
   if (isAllowedOrigin(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin as string);
+    res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
 
@@ -95,32 +90,28 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-app.get("/", (_req: Request, res: Response) => {
+app.get("/", (_req: any, res: any) => {
   res.status(200).json({
     ok: true,
     service: "latest-orion-api-server",
   });
 });
 
-app.get("/health", (_req: Request, res: Response) => {
+app.get("/health", (_req: any, res: any) => {
   res.status(200).json({
     ok: true,
     service: "latest-orion-api-server",
   });
 });
 
-app.get("/api/health", (_req: Request, res: Response) => {
+app.get("/api/health", (_req: any, res: any) => {
   res.status(200).json({
     ok: true,
     service: "latest-orion-api-server",
   });
 });
 
-/**
- * Lazy-load routes so /health and /api/health do not crash
- * if one route file has a DB/env/import error.
- */
-app.use("/api", async (req: Request, res: Response, next: NextFunction) => {
+app.use("/api", async (req: any, res: any, next: any) => {
   try {
     const mod = await import("./routes/index.js");
     return mod.default(req, res, next);
@@ -134,13 +125,13 @@ app.use("/api", async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-app.use((_req: Request, res: Response) => {
+app.use((_req: any, res: any) => {
   res.status(404).json({
     error: "Route not found",
   });
 });
 
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: unknown, _req: any, res: any, _next: any) => {
   console.error("🔥 Server Error:", err);
 
   if (res.headersSent) return;
