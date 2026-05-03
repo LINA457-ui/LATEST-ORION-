@@ -1,17 +1,15 @@
-import { Router, type IRouter, type Response } from "express";
-import { db } from "../../../../lib/db/dist/index.js";
-import { holdings } from "../../../../lib/db/dist/schema/index.js";
+import express from "express";
+import { db } from "../../../../lib/db/src/index.js";
+import { holdings } from "../../../../lib/db/src/schema/holdings.js";
 import { eq } from "drizzle-orm";
-import { requireAuth, userIdOf } from "../lib/auth";
-import { getMeta, getQuote } from "../lib/marketData";
+import { requireAuth, userIdOf } from "../lib/auth.js";
+import { getMeta, getQuote } from "../lib/marketData.js";
 
-const router: IRouter = Router();
-
-type AnyRow = any;
+const router: any = express.Router();
 
 router.use(requireAuth);
 
-router.get("/positions", async (req, res: Response) => {
+router.get("/positions", async (req, res: any) => {
   const userId = userIdOf(req);
 
   const rows = (await db
@@ -53,7 +51,7 @@ router.get("/positions", async (req, res: Response) => {
   res.json(positions);
 });
 
-router.get("/allocation", async (req, res: Response) => {
+router.get("/allocation", async (req, res: any) => {
   const userId = userIdOf(req);
 
   const rows = (await db
