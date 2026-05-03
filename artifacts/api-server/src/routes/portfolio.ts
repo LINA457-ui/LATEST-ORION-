@@ -5,11 +5,13 @@ import { eq } from "drizzle-orm";
 import { requireAuth, userIdOf } from "../lib/auth.js";
 import { getMeta, getQuote } from "../lib/marketData.js";
 
+type AnyRow = any;
+
 const router: any = express.Router();
 
 router.use(requireAuth);
 
-router.get("/positions", async (req, res: any) => {
+router.get("/positions", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const rows = (await db
@@ -51,7 +53,7 @@ router.get("/positions", async (req, res: any) => {
   res.json(positions);
 });
 
-router.get("/allocation", async (req, res: any) => {
+router.get("/allocation", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const rows = (await db
