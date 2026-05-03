@@ -1,9 +1,10 @@
 import express from "express";
-import { db } from "../../../../lib/db/src/index.js";
-import { conversations } from "../../../../lib/db/src/schema/conversations.js";
-import { messages } from "../../../../lib/db/src/schema/messages.js";
-import { holdings } from "../../../../lib/db/src/schema/holdings.js";
-import { watchlist } from "../../../../lib/db/src/schema/watchlist.js";
+import { db } from "@workspace/db";
+import { accounts } from "@workspace/db/schema/accounts";
+import { holdings } from "@workspace/db/schema/holdings";
+import { orders } from "@workspace/db/schema/orders";
+import { transactions } from "@workspace/db/schema/transactions";
+import { watchlist } from "@workspace/db/schema/watchlist";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { requireAuth, userIdOf } from "../lib/auth.js";
 import { getAccountSnapshot } from "./account.js";
