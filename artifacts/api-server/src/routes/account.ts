@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { db } from "../../../../lib/db/src/schema/index.js";
+import { db } from "../../../../lib/db/src/index.js";
 import {
   accounts,
   holdings,
