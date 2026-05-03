@@ -4,7 +4,6 @@ import express, {
   type Request,
   type Response,
 } from "express";
-import cors, { type CorsOptions } from "cors";
 import { createRequire } from "node:module";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
@@ -16,25 +15,19 @@ const app: Express = express();
 
 app.set("etag", false);
 
-const corsOptions: CorsOptions = {
-  origin: true,
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Admin-Pin-Token",
-    "x-admin-pin-token",
-  ],
-};
-
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+const allowedOrigins = new Set([
+  "http://localhost:5173",
+  "http://localhost:5000",
+  "https://orion-2026-fidelis.vercel.app",
+  "https://orion-2026-fidelis-linas-projects-3515e4d1.vercel.app",
+  "https://www.investmentorion.com",
+  "https://investmentorion.com",
+]);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
 
-  if (origin) {
+  if (origin && allowedOrigins.has(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
 
