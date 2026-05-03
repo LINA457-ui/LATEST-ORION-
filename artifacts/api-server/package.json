@@ -5,8 +5,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-  "dev": "tsx watch src/index.ts",
-  "prebuild": "pnpm --dir ../../lib/db build",
+    "dev": "tsx watch src/index.ts",
+  "prebuild": "pnpm --dir ../../lib/db build && mkdir -p ../../lib/api-zod/dist ../../lib/integrations-openai-ai-server/dist && cp -r ../../lib/api-zod/src/* ../../lib/api-zod/dist/ && cp -r ../../lib/integrations-openai-ai-server/src/* ../../lib/integrations-openai-ai-server/dist/",
   "build": "tsc -p tsconfig.json",
   "start": "node dist/index.js"
   },
