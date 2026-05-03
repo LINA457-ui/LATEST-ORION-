@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { db } from "../../../../lib/db/src/index.js";
-import { adminPins } from "../../../../lib/db/src/schema/index.js";
+import { db } from "../../../../lib/db/dist/index.js";
+import { adminPins } from "../../../../lib/db/dist/schema/index.js";
 import { count } from "drizzle-orm";
 // SESSION_SECRET is REQUIRED — it is the HMAC key for PIN tokens. A predictable
 // fallback would let any signed-in admin forge a valid X-Admin-Pin header

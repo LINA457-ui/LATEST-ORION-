@@ -1,15 +1,11 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "artifacts/api-server/src/index.ts",
-      "use": "@vercel/node"
-    }
-  ],
+  "buildCommand": "pnpm --filter @workspace/api-server build",
+  "outputDirectory": "artifacts/api-server/dist",
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "artifacts/api-server/src/index.ts"
+      "dest": "artifacts/api-server/dist/index.js"
     }
   ]
 }

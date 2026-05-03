@@ -4,7 +4,7 @@ import {
   GetSymbolChartParams,
   GetSymbolChartQueryParams,
   ListQuotesQueryParams,
-} from "../../../../lib/api-zod/src/index.js";
+} from "../../../../lib/api-zod/dist/index.js";
 import {
   getAllQuotes,
   getChart,

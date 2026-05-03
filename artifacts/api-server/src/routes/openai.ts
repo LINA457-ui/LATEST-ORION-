@@ -5,17 +5,17 @@ import {
   type Response,
 } from "express";
 
-import { db } from "../../../../lib/db/src/index.js";
+import { db } from "../../../../lib/db/dist/index.js";
 import {
   conversations,
   messages,
   holdings,
   watchlist,
-} from "../../../../lib/db/src/schema/index.js";
+} from "../../../../lib/db/dist/schema/index.js";
 
 import { and, asc, desc, eq } from "drizzle-orm";
 
-import { openai } from "../../../../lib/integrations-openai-ai-server/src/index.js";
+import { openai } from "../../../../lib/integrations-openai-ai-server/dist/index.js";
 
 import {
   CreateOpenaiConversationBody,
@@ -24,7 +24,7 @@ import {
   ListOpenaiMessagesParams,
   SendOpenaiMessageBody,
   SendOpenaiMessageParams,
-} from "../../../../lib/api-zod/src/index.js";
+} from "../../../../lib/api-zod/dist/index.js";
 
 import { requireAuth, userIdOf } from "../lib/auth";
 import { getAccountSnapshot } from "./account";

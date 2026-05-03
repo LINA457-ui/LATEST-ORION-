@@ -5,18 +5,16 @@ import {
   type Response,
 } from "express";
 
-import { db } from "../../../../lib/db/src/index.js";
+import { db } from "../../../../lib/db/dist/index.js";
 import {
   accounts,
   holdings,
   orders,
   transactions,
-} from "../../../../lib/db/src/schema/index.js";
+} from "../../../../lib/db/dist/schema/index.js";
 
-import { PlaceOrderBody } from "../../../../lib/api-zod/src/index.js";
-
+import { PlaceOrderBody } from "../../../../lib/api-zod/dist/index.js";
 import { and, desc, eq, sql } from "drizzle-orm";
-
 import { requireAuth, ensureAccount, userIdOf } from "../lib/auth";
 import { getMeta, getQuote } from "../lib/marketData";
 
