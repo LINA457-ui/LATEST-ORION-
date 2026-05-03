@@ -1,8 +1,12 @@
 import { Router, type IRouter, type Response } from "express";
-import { db } from "@workspace/db";
-import { accounts, transactions } from "@workspace/db/schema";
+import { db } from "../../../../lib/db/dist/index.js";
+import { accounts, transactions } from "../../../../lib/db/dist/schema/index.js";
+import {
+  ConfirmDepositBody,
+  CreateDepositCheckoutBody,
+} from "../../../../lib/api-zod/dist/index.js";
 import { eq, sql } from "drizzle-orm";
-import { ConfirmDepositBody, CreateDepositCheckoutBody } from "@workspace/api-zod";
+
 import { requireAuth, ensureAccount, userIdOf } from "../lib/auth";
 
 const router: IRouter = Router();

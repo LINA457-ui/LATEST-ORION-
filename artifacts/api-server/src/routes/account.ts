@@ -1,12 +1,12 @@
 import { Router, type Request, type Response } from "express";
-import { db } from "@workspace/db";
+import { db } from "../../../../lib/db/dist/index.js";
 import {
   accounts,
   holdings,
   orders,
   transactions,
   watchlist,
-} from "@workspace/db/schema";
+} from "../../../../lib/db/dist/schema/index.js";
 import { and, desc, eq } from "drizzle-orm";
 import {
   AddToWatchlistBody,

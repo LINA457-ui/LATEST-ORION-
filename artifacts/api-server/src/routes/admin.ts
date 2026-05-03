@@ -1,12 +1,12 @@
 import { Router, type IRouter, type Response } from "express";
-import { db } from "@workspace/db";
+import { db } from "../../../../lib/db/dist/index.js";
 import {
   accounts,
   adminPins,
   holdings,
   orders,
   transactions,
-} from "@workspace/db/schema";
+} from "../../../../lib/db/dist/schema/index.js";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   requireAuth,

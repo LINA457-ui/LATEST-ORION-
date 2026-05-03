@@ -4,13 +4,13 @@ import {
   type Request,
   type Response,
 } from "express";
-import { db } from "@workspace/db";
+import { db } from "../../../../lib/db/dist/index.js";
 import {
   conversations,
   messages,
   holdings,
   watchlist,
-} from "@workspace/db/schema";
+} from "../../../../lib/db/dist/schema/index.js";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import {

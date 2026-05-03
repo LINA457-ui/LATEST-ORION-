@@ -4,15 +4,16 @@ import {
   type Request,
   type Response,
 } from "express";
-import { db } from "@workspace/db";
+import { db } from "../../../../lib/db/dist/index.js";
 import {
   accounts,
   holdings,
   orders,
   transactions,
-} from "@workspace/db/schema";
+} from "../../../../lib/db/dist/schema/index.js";
+import { PlaceOrderBody } from "../../../../lib/api-zod/dist/index.js";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { PlaceOrderBody } from "@workspace/api-zod";
+
 import { requireAuth, ensureAccount, userIdOf } from "../lib/auth";
 import { getMeta, getQuote } from "../lib/marketData";
 
