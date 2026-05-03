@@ -1,17 +1,5 @@
 {
   "version": 2,
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm --filter @workspace/api-server build",
-  "builds": [
-    {
-      "src": "artifacts/api-server/dist/index.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/artifacts/api-server/dist/index.js"
-    }
-  ]
+  "buildCommand": "pnpm --filter @workspace/api-server build"
 }
