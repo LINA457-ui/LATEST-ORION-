@@ -1,28 +1,24 @@
-import {
-  Router,
-  type IRouter,
-  type Request,
-  type Response,
-} from "express";
-
-import { db } from "../../../../lib/db/dist/index.js";
-import {
-  accounts,
-  holdings,
-  orders,
-  transactions,
-} from "../../../../lib/db/dist/schema/index.js";
-
-import { PlaceOrderBody } from "../../../../lib/api-zod/dist/index.js";
+import express from "express";
+import { db } from "../../../../lib/db/src/index.js";
+import { accounts } from "../../../../lib/db/src/schema/accounts.js";
+import { holdings } from "../../../../lib/db/src/schema/holdings.js";
+import { orders } from "../../../../lib/db/src/schema/orders.js";
+import { transactions } from "../../../../lib/db/src/schema/transactions.js";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { requireAuth, ensureAccount, userIdOf } from "../lib/auth";
-import { getMeta, getQuote } from "../lib/marketData";
+import { requireAuth, ensureAccount, userIdOf } from "../lib/auth.js";
+import { getMeta, getQuote } from "../lib/marketData.js";
 
-const router: IRouter = Router();
+const router: any = express.Router();
+
+const PlaceOrderBody = {
+  parse(data: any) {
+    return data ?? {};
+  },
+};
 
 router.use(requireAuth);
 
-router.get("/orders", async (req: Request, res: Response) => {
+router.get("/orders", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const rows = await db
@@ -33,7 +29,7 @@ router.get("/orders", async (req: Request, res: Response) => {
     .limit(100);
 
   res.json(
-    rows.map((o: (typeof rows)[number]) => {
+    rows.map((o: any) => {
       const meta = getMeta(o.symbol);
 
       return {
@@ -51,21 +47,29 @@ router.get("/orders", async (req: Request, res: Response) => {
   );
 });
 
-router.post("/orders", async (req: Request, res: Response) => {
+router.post("/orders", async (req: any, res: any) => {
   const userId = userIdOf(req);
   const body = PlaceOrderBody.parse(req.body);
 
-  const symbol = body.symbol.toUpperCase();
+  const symbol = String(body.symbol ?? "").toUpperCase();
+  const side = body.side === "sell" ? "sell" : "buy";
+  const quantity = Number(body.quantity);
+
+  if (!symbol) {
+    res.status(400).json({ error: "Symbol is required" });
+    return;
+  }
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    res.status(400).json({ error: "Quantity must be positive" });
+    return;
+  }
+
   const meta = getMeta(symbol);
   const quote = getQuote(symbol);
 
   if (!meta || !quote) {
     res.status(400).json({ error: "Unknown symbol" });
-    return;
-  }
-
-  if (body.quantity <= 0) {
-    res.status(400).json({ error: "Quantity must be positive" });
     return;
   }
 
@@ -77,9 +81,9 @@ router.post("/orders", async (req: Request, res: Response) => {
   }
 
   const price = quote.price;
-  const total = Number((price * body.quantity).toFixed(2));
+  const total = Number((price * quantity).toFixed(2));
 
-  if (body.side === "buy") {
+  if (side === "buy") {
     const cash = Number(account.cashBalance);
 
     if (cash < total) {
@@ -103,12 +107,10 @@ router.post("/orders", async (req: Request, res: Response) => {
     if (existing) {
       const prevQty = Number(existing.quantity);
       const prevAvg = Number(existing.averageCost);
-      const newQty = prevQty + body.quantity;
+      const newQty = prevQty + quantity;
 
       const newAvg =
-        newQty > 0
-          ? (prevAvg * prevQty + price * body.quantity) / newQty
-          : 0;
+        newQty > 0 ? (prevAvg * prevQty + price * quantity) / newQty : 0;
 
       await db
         .update(holdings)
@@ -122,7 +124,7 @@ router.post("/orders", async (req: Request, res: Response) => {
       await db.insert(holdings).values({
         userId,
         symbol,
-        quantity: body.quantity.toFixed(6),
+        quantity: quantity.toFixed(6),
         averageCost: price.toFixed(4),
       });
     }
@@ -137,12 +139,12 @@ router.post("/orders", async (req: Request, res: Response) => {
 
     const prevQty = existing ? Number(existing.quantity) : 0;
 
-    if (!existing || prevQty < body.quantity) {
+    if (!existing || prevQty < quantity) {
       res.status(400).json({ error: "Insufficient shares to sell" });
       return;
     }
 
-    const newQty = prevQty - body.quantity;
+    const newQty = prevQty - quantity;
 
     if (newQty <= 0) {
       await db.delete(holdings).where(eq(holdings.id, existing.id));
@@ -167,8 +169,8 @@ router.post("/orders", async (req: Request, res: Response) => {
     .values({
       userId,
       symbol,
-      side: body.side,
-      quantity: body.quantity.toFixed(6),
+      side,
+      quantity: quantity.toFixed(6),
       price: price.toFixed(4),
       total: total.toFixed(2),
       status: "filled",
@@ -182,10 +184,9 @@ router.post("/orders", async (req: Request, res: Response) => {
 
   await db.insert(transactions).values({
     userId,
-    type: body.side,
-    description: `${body.side === "buy" ? "Bought" : "Sold"
-      } ${body.quantity} ${symbol} @ $${price.toFixed(2)}`,
-    amount: (body.side === "buy" ? -total : total).toFixed(2),
+    type: side,
+    description: `${side === "buy" ? "Bought" : "Sold"} ${quantity} ${symbol} @ $${price.toFixed(2)}`,
+    amount: (side === "buy" ? -total : total).toFixed(2),
     symbol,
   });
 
@@ -193,8 +194,8 @@ router.post("/orders", async (req: Request, res: Response) => {
     id: order.id,
     symbol,
     name: meta.name,
-    side: body.side,
-    quantity: body.quantity,
+    side,
+    quantity,
     price,
     total,
     status: "filled",
