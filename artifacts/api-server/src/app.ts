@@ -1,17 +1,12 @@
-import express, {
-  type Express,
-  type NextFunction,
-  type Request,
-  type Response,
-} from "express";
+import express from "express";
 import { createRequire } from "node:module";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 
 const require = createRequire(import.meta.url);
-const pinoHttp = require("pino-http") as any;
+const pinoHttp = require("pino-http");
 
-const app: Express = express();
+const app = express();
 
 app.set("etag", false);
 
@@ -24,7 +19,7 @@ const allowedOrigins = new Set([
   "https://investmentorion.com",
 ]);
 
-app.use((req: Request, res: Response, next: NextFunction) => {
+app.use((req, res, next) => {
   const origin = req.headers.origin;
 
   if (origin && allowedOrigins.has(origin)) {
@@ -55,14 +50,14 @@ app.use(
   pinoHttp({
     logger,
     serializers: {
-      req(req: Request & { id?: string }) {
+      req(req: any) {
         return {
           id: req.id,
           method: req.method,
           url: req.url?.split("?")[0],
         };
       },
-      res(res: Response) {
+      res(res: any) {
         return {
           statusCode: res.statusCode,
         };
@@ -74,14 +69,14 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-app.get("/", (_req: Request, res: Response) => {
+app.get("/", (_req, res) => {
   res.status(200).json({
     ok: true,
     service: "latest-orion-api-server",
   });
 });
 
-app.get("/health", (_req: Request, res: Response) => {
+app.get("/health", (_req, res) => {
   res.status(200).json({
     ok: true,
     service: "latest-orion-api-server",
@@ -90,7 +85,7 @@ app.get("/health", (_req: Request, res: Response) => {
 
 app.use("/api", router);
 
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: unknown, _req: any, res: any, _next: any) => {
   console.error("🔥 Server Error:", err);
 
   if (res.headersSent) return;
