@@ -53,7 +53,24 @@ export type AccountSnapshot = {
   };
 };
 
-export async function getAccountSnapshot(userId: string): Promise<AccountSnapshot> {
+type Position = {
+  id: number;
+  symbol: string;
+  name: string;
+  sector: string;
+  quantity: number;
+  averageCost: number;
+  currentPrice: number;
+  marketValue: number;
+  unrealizedPnl: number;
+  unrealizedPnlPercent: number;
+  dayChange: number;
+  dayChangePercent: number;
+};
+
+export async function getAccountSnapshot(
+  userId: string,
+): Promise<AccountSnapshot> {
   const account = await ensureAccount(userId);
 
   const userHoldings = await db
@@ -251,7 +268,7 @@ router.get("/transactions", async (req: Request, res: Response) => {
     .limit(100);
 
   res.json(
-    rows.map((t) => ({
+    rows.map((t: (typeof rows)[number]) => ({
       id: t.id,
       type: t.type,
       description: t.description,
@@ -329,11 +346,11 @@ router.get("/watchlist", async (req: Request, res: Response) => {
     .orderBy(desc(watchlist.createdAt));
 
   const symbols = rows.length
-    ? rows.map((row) => row.symbol)
+    ? rows.map((row: (typeof rows)[number]) => row.symbol)
     : POPULAR_SYMBOLS.slice(0, 6);
 
   const quotes = symbols
-    .map((symbol) => getQuote(symbol))
+    .map((symbol: string) => getQuote(symbol))
     .filter((quote): quote is NonNullable<typeof quote> => Boolean(quote));
 
   res.json(quotes);
@@ -394,7 +411,7 @@ router.get("/dashboard", async (req: Request, res: Response) => {
     .where(eq(holdings.userId, userId));
 
   const positions = userHoldings
-    .map((holding) => {
+    .map((holding: (typeof userHoldings)[number]): Position | null => {
       const quote = getQuote(holding.symbol);
       const meta = getMeta(holding.symbol);
 
@@ -410,7 +427,9 @@ router.get("/dashboard", async (req: Request, res: Response) => {
 
       const unrealizedPnlPercent =
         averageCost > 0
-          ? Number((((quote.price - averageCost) / averageCost) * 100).toFixed(2))
+          ? Number(
+              (((quote.price - averageCost) / averageCost) * 100).toFixed(2),
+            )
           : 0;
 
       return {
@@ -428,9 +447,7 @@ router.get("/dashboard", async (req: Request, res: Response) => {
         dayChangePercent: quote.changePercent,
       };
     })
-    .filter((position): position is NonNullable<typeof position> =>
-      Boolean(position),
-    );
+    .filter((position): position is Position => Boolean(position));
 
   const watchRows = await db
     .select()
@@ -439,51 +456,55 @@ router.get("/dashboard", async (req: Request, res: Response) => {
     .orderBy(desc(watchlist.createdAt));
 
   const watchSymbols = watchRows.length
-    ? watchRows.map((row) => row.symbol)
+    ? watchRows.map((row: (typeof watchRows)[number]) => row.symbol)
     : POPULAR_SYMBOLS.slice(0, 6);
 
   const watchQuotes = watchSymbols
-    .map((symbol) => getQuote(symbol))
+    .map((symbol: string) => getQuote(symbol))
     .filter((quote): quote is NonNullable<typeof quote> => Boolean(quote));
 
-  const recentOrders = (
-    await db
-      .select()
-      .from(orders)
-      .where(eq(orders.userId, userId))
-      .orderBy(desc(orders.createdAt))
-      .limit(8)
-  ).map((order) => {
-    const meta = getMeta(order.symbol);
+  const recentOrderRows = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.userId, userId))
+    .orderBy(desc(orders.createdAt))
+    .limit(8);
 
-    return {
-      id: order.id,
-      symbol: order.symbol,
-      name: meta?.name ?? order.symbol,
-      side: order.side as "buy" | "sell",
-      quantity: Number(order.quantity),
-      price: Number(order.price),
-      total: Number(order.total),
-      status: order.status as "filled" | "pending" | "rejected",
-      createdAt: order.createdAt.toISOString(),
-    };
-  });
+  const recentOrders = recentOrderRows.map(
+    (order: (typeof recentOrderRows)[number]) => {
+      const meta = getMeta(order.symbol);
 
-  const recentTransactions = (
-    await db
-      .select()
-      .from(transactions)
-      .where(eq(transactions.userId, userId))
-      .orderBy(desc(transactions.createdAt))
-      .limit(8)
-  ).map((transaction) => ({
-    id: transaction.id,
-    type: transaction.type,
-    description: transaction.description,
-    amount: Number(transaction.amount),
-    symbol: transaction.symbol ?? null,
-    createdAt: transaction.createdAt.toISOString(),
-  }));
+      return {
+        id: order.id,
+        symbol: order.symbol,
+        name: meta?.name ?? order.symbol,
+        side: order.side as "buy" | "sell",
+        quantity: Number(order.quantity),
+        price: Number(order.price),
+        total: Number(order.total),
+        status: order.status as "filled" | "pending" | "rejected",
+        createdAt: order.createdAt.toISOString(),
+      };
+    },
+  );
+
+  const recentTransactionRows = await db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.userId, userId))
+    .orderBy(desc(transactions.createdAt))
+    .limit(8);
+
+  const recentTransactions = recentTransactionRows.map(
+    (transaction: (typeof recentTransactionRows)[number]) => ({
+      id: transaction.id,
+      type: transaction.type,
+      description: transaction.description,
+      amount: Number(transaction.amount),
+      symbol: transaction.symbol ?? null,
+      createdAt: transaction.createdAt.toISOString(),
+    }),
+  );
 
   res.json({
     account: snapshot,
