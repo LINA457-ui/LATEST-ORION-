@@ -1,19 +1,19 @@
-import { Router, type Request, type Response } from "express";
-import { db } from "../../../../lib/db/dist/index.js";
+import express from "express";
+import { db } from "../../../../lib/db/src/index.js";
 import {
   accounts,
   holdings,
   orders,
   transactions,
   watchlist,
-} from "../../../../lib/db/dist/schema/index.js";
+} from "../../../../lib/db/src/schema/index.js";
 import { and, desc, eq } from "drizzle-orm";
 import {
   AddToWatchlistBody,
   RemoveFromWatchlistParams,
   GetAccountPerformanceQueryParams,
-} from "../../../../lib/api-zod/dist/index.js";
-import { requireAuth, ensureAccount, userIdOf } from "../lib/auth";
+} from "../../../../lib/api-zod/src/index.js";
+import { requireAuth, ensureAccount, userIdOf } from "../lib/auth.js";
 import {
   getEquityCurve,
   getIndices,
@@ -23,9 +23,9 @@ import {
   getQuote,
   POPULAR_SYMBOLS,
   type Range,
-} from "../lib/marketData";
+} from "../lib/marketData.js";
 
-const router = Router();
+const router: any = express.Router();
 
 router.use(requireAuth);
 
@@ -165,13 +165,13 @@ export async function getAccountSnapshot(
   };
 }
 
-router.get("/me", async (req: Request, res: Response) => {
+router.get("/me", async (req: any, res: any) => {
   const userId = userIdOf(req);
   const snapshot = await getAccountSnapshot(userId);
   res.json(snapshot);
 });
 
-router.post("/sync", async (req: Request, res: Response) => {
+router.post("/sync", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const { email, displayName } = (req.body ?? {}) as {
@@ -183,7 +183,7 @@ router.post("/sync", async (req: Request, res: Response) => {
   res.json({ ok: true, userId });
 });
 
-router.post("/avatar", async (req: Request, res: Response) => {
+router.post("/avatar", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const { avatarUrl } = (req.body ?? {}) as {
@@ -231,7 +231,7 @@ router.post("/avatar", async (req: Request, res: Response) => {
   res.json({ ok: true, avatarUrl });
 });
 
-router.get("/performance", async (req: Request, res: Response) => {
+router.get("/performance", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const parsed = GetAccountPerformanceQueryParams.parse(req.query);
@@ -257,7 +257,7 @@ router.get("/performance", async (req: Request, res: Response) => {
   });
 });
 
-router.get("/transactions", async (req: Request, res: Response) => {
+router.get("/transactions", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const rows = await db
@@ -279,7 +279,7 @@ router.get("/transactions", async (req: Request, res: Response) => {
   );
 });
 
-router.post("/transactions", async (req: Request, res: Response) => {
+router.post("/transactions", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const { type, description, amount, symbol } = (req.body ?? {}) as {
@@ -336,7 +336,7 @@ router.post("/transactions", async (req: Request, res: Response) => {
   });
 });
 
-router.get("/watchlist", async (req: Request, res: Response) => {
+router.get("/watchlist", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const rows = await db
@@ -358,7 +358,7 @@ router.get("/watchlist", async (req: Request, res: Response) => {
   res.json(quotes);
 });
 
-router.post("/watchlist", async (req: Request, res: Response) => {
+router.post("/watchlist", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const body = AddToWatchlistBody.parse(req.body);
@@ -381,7 +381,7 @@ router.post("/watchlist", async (req: Request, res: Response) => {
   res.status(201).json(quote);
 });
 
-router.delete("/watchlist/:symbol", async (req: Request, res: Response) => {
+router.delete("/watchlist/:symbol", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const params = RemoveFromWatchlistParams.parse(req.params);
@@ -394,7 +394,7 @@ router.delete("/watchlist/:symbol", async (req: Request, res: Response) => {
   res.status(204).end();
 });
 
-router.get("/dashboard", async (req: Request, res: Response) => {
+router.get("/dashboard", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const snapshot = await getAccountSnapshot(userId);
