@@ -1,12 +1,10 @@
 import express from "express";
 import { db } from "../../../../lib/db/src/index.js";
-import {
-  accounts,
-  holdings,
-  orders,
-  transactions,
-  watchlist,
-} from "../../../../lib/db/src/schema/index.js";
+import { accounts } from "../../../../lib/db/src/schema/accounts.js";
+import { holdings } from "../../../../lib/db/src/schema/holdings.js";
+import { orders } from "../../../../lib/db/src/schema/orders.js";
+import { transactions } from "../../../../lib/db/src/schema/transactions.js";
+import { watchlist } from "../../../../lib/db/src/schema/watchlist.js";
 import { and, desc, eq } from "drizzle-orm";
 import {
   AddToWatchlistBody,
