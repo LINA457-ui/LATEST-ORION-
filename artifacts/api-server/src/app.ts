@@ -16,26 +16,8 @@ const app: Express = express();
 
 app.set("etag", false);
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:5000",
-  "https://orion-2026-fidelis.vercel.app",
-  "https://orion-2026-fidelis-linas-projects-3515e4d1.vercel.app",
-  "https://www.investmentorion.com",
-  "https://investmentorion.com",
-];
-
 const corsOptions: CorsOptions = {
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    console.log("❌ CORS blocked:", origin);
-    return callback(new Error(`Blocked by CORS: ${origin}`));
-  },
+  origin: true,
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: [
@@ -49,8 +31,30 @@ const corsOptions: CorsOptions = {
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-app.use((_req: Request, res: Response, next: NextFunction) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
+
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Admin-Pin-Token, x-admin-pin-token",
+  );
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+  );
   res.setHeader("Cache-Control", "no-store");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+
   next();
 });
 
@@ -76,6 +80,13 @@ app.use(
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+app.get("/", (_req: Request, res: Response) => {
+  res.status(200).json({
+    ok: true,
+    service: "latest-orion-api-server",
+  });
+});
 
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({
