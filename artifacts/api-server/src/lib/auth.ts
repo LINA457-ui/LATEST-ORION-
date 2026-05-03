@@ -1,8 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { db, accounts } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import { createAccountWithSeed } from "./seedPortfolio";
-import { verifyPinToken } from "./adminPin";
+import { createAccountWithSeed } from "./seedPortfolio.js";
 
 export type AuthedRequest = Request & { userId: string };
 
@@ -29,37 +28,7 @@ export async function ensureAccount(
     .where(eq(accounts.userId, userId))
     .limit(1);
 
-  if (existing[0]) {
-    const updates: Partial<typeof accounts.$inferInsert> = {};
-
-    if (email && existing[0].email !== email) {
-      updates.email = email;
-    }
-
-    if (
-      displayName &&
-      displayName !== "Investor" &&
-      (existing[0].displayName === "Investor" || !existing[0].displayName)
-    ) {
-      updates.displayName = displayName;
-    }
-
-    if (!existing[0].isAdmin) {
-      updates.isAdmin = true;
-    }
-
-    if (Object.keys(updates).length > 0) {
-      const [updated] = await db
-        .update(accounts)
-        .set(updates)
-        .where(eq(accounts.userId, userId))
-        .returning();
-
-      return updated || existing[0];
-    }
-
-    return existing[0];
-  }
+  if (existing[0]) return existing[0];
 
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -123,21 +92,28 @@ export function requireAuth(
 
 export async function requireAdmin(
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction,
 ) {
-  const userId = userIdOf(req);
+  try {
+    const userId = userIdOf(req);
+    const account = await ensureAccount(userId, DEV_NAME, DEV_EMAIL);
 
-  await ensureAccount(userId, DEV_NAME, DEV_EMAIL);
+    if (!account) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
-  await db
-    .update(accounts)
-    .set({ isAdmin: true })
-    .where(eq(accounts.userId, userId));
+    await db
+      .update(accounts)
+      .set({ isAdmin: true })
+      .where(eq(accounts.userId, userId));
 
-  asAuthed(req).userId = userId;
-
-  next();
+    asAuthed(req).userId = userId;
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
 
 export function requirePinVerified(

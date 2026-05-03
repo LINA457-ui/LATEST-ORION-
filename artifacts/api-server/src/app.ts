@@ -86,4 +86,14 @@ app.get("/health", (_req: Request, res: Response) => {
 
 app.use("/api", router);
 
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("🔥 Server Error:", err);
+
+  if (res.headersSent) return;
+
+  res.status(500).json({
+    error: err instanceof Error ? err.message : "Internal Server Error",
+  });
+});
+
 export default app;
