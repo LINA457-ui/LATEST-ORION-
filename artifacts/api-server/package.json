@@ -5,13 +5,15 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+  "dev": "tsx watch src/index.ts",
+  "prebuild": "pnpm --dir ../../lib/db build",
+  "build": "tsc -p tsconfig.json",
+  "start": "node dist/index.js"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
+    
     "@workspace/integrations-openai-ai-server": "workspace:*",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
