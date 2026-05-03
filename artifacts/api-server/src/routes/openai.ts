@@ -172,7 +172,7 @@ router.post("/conversations", async (req: any, res: any) => {
 router.get("/conversations/:id", async (req: any, res: any) => {
   const userId = userIdOf(req);
   const params = GetOpenaiConversationParams.parse(req.params);
-  const id = String(params.id ?? "");
+  const id = Number(params.id);
 
   const conv = (
     await db
@@ -210,7 +210,7 @@ router.get("/conversations/:id", async (req: any, res: any) => {
 router.delete("/conversations/:id", async (req: any, res: any) => {
   const userId = userIdOf(req);
   const params = DeleteOpenaiConversationParams.parse(req.params);
-  const id = String(params.id ?? "");
+  const id = Number(params.id);
 
   await db
     .delete(conversations)
@@ -222,7 +222,7 @@ router.delete("/conversations/:id", async (req: any, res: any) => {
 router.get("/conversations/:id/messages", async (req: any, res: any) => {
   const userId = userIdOf(req);
   const params = ListOpenaiMessagesParams.parse(req.params);
-  const id = String(params.id ?? "");
+  const id = Number(params.id);
 
   const conv = (
     await db
@@ -259,7 +259,7 @@ router.post("/conversations/:id/messages", async (req: any, res: any) => {
   const params = SendOpenaiMessageParams.parse(req.params);
   const body = SendOpenaiMessageBody.parse(req.body);
 
-  const id = String(params.id ?? "");
+  const id = Number(params.id);
   const content = String(body.content ?? "").trim();
 
   if (!content) {

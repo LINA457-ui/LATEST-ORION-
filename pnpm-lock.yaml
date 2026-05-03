@@ -199,6 +199,9 @@ importers:
       http-proxy-middleware:
         specifier: ^3.0.5
         version: 3.0.5
+      openai:
+        specifier: ^6.35.0
+        version: 6.35.0(zod@3.25.76)
       pg:
         specifier: ^8.20.0
         version: 8.20.0
