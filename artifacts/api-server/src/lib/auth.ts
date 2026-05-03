@@ -1,20 +1,19 @@
-import type { NextFunction, Request, Response } from "express";
-import { db } from "../../../../lib/db/dist/index.js";
-import { accounts } from "../../../../lib/db/dist/schema/index.js";
+import { db } from "../../../../lib/db/src/index.js";
+import { accounts } from "../../../../lib/db/src/schema/accounts.js";
 import { eq, sql } from "drizzle-orm";
 import { createAccountWithSeed } from "./seedPortfolio.js";
 
-export type AuthedRequest = Request & { userId: string };
+export type AuthedRequest = any;
 
 const DEV_USER_ID = "dev-user";
 const DEV_EMAIL = "dev@example.com";
 const DEV_NAME = "Dev Admin";
 
-function asAuthed(req: Request): AuthedRequest {
+function asAuthed(req: any): AuthedRequest {
   return req as AuthedRequest;
 }
 
-export function userIdOf(req: Request): string {
+export function userIdOf(req: any): string {
   return asAuthed(req).userId || DEV_USER_ID;
 }
 
@@ -82,20 +81,12 @@ export async function ensureAccount(
   }
 }
 
-export function requireAuth(
-  req: Request,
-  _res: Response,
-  next: NextFunction,
-) {
+export function requireAuth(req: any, _res: any, next: any) {
   asAuthed(req).userId = DEV_USER_ID;
   next();
 }
 
-export async function requireAdmin(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
+export async function requireAdmin(req: any, res: any, next: any) {
   try {
     const userId = userIdOf(req);
     const account = await ensureAccount(userId, DEV_NAME, DEV_EMAIL);
@@ -117,10 +108,6 @@ export async function requireAdmin(
   }
 }
 
-export function requirePinVerified(
-  _req: Request,
-  _res: Response,
-  next: NextFunction,
-) {
+export function requirePinVerified(_req: any, _res: any, next: any) {
   next();
 }
