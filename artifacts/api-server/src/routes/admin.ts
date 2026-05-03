@@ -1,23 +1,21 @@
-import { Router, type IRouter, type Response } from "express";
-import { db } from "../../../../lib/db/dist/index.js";
-import {
-  accounts,
-  adminPins,
-  holdings,
-  orders,
-  transactions,
-} from "../../../../lib/db/dist/schema/index.js";
+import express from "express";
+import { db } from "../../../../lib/db/src/index.js";
+import { accounts } from "../../../../lib/db/src/schema/accounts.js";
+import { adminPins } from "../../../../lib/db/src/schema/adminPins.js";
+import { holdings } from "../../../../lib/db/src/schema/holdings.js";
+import { orders } from "../../../../lib/db/src/schema/orders.js";
+import { transactions } from "../../../../lib/db/src/schema/transactions.js";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   requireAuth,
   requireAdmin,
   requirePinVerified,
   userIdOf,
-} from "../lib/auth";
-import { getMeta, getQuote } from "../lib/marketData";
-import { hashPin, issuePinToken, MAX_PINS, verifyPin } from "../lib/adminPin";
+} from "../lib/auth.js";
+import { getMeta, getQuote } from "../lib/marketData.js";
+import { hashPin, issuePinToken, MAX_PINS, verifyPin } from "../lib/adminPin.js";
 
-const router: IRouter = Router();
+const router: any = express.Router();
 
 type AnyRow = any;
 
@@ -29,7 +27,7 @@ type UserLookup = {
 router.use(requireAuth);
 
 // Public-to-admins check used by the frontend to gate the /admin nav link
-router.get("/check", async (req, res: Response) => {
+router.get("/check", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
   const [account] = await db
@@ -44,7 +42,7 @@ router.get("/check", async (req, res: Response) => {
 // PIN verification: any signed-in user must submit the right PIN to unlock
 // the admin section. Returns a short-lived HMAC token sent back as the
 // X-Admin-Pin header on subsequent admin requests.
-router.post("/pin/verify", async (req, res: Response) => {
+router.post("/pin/verify", async (req: any, res: any) => {
   const userId = userIdOf(req);
   const { pin } = (req.body ?? {}) as { pin?: string };
 
@@ -82,7 +80,7 @@ router.post("/pin/verify", async (req, res: Response) => {
 router.use(requireAdmin);
 
 // ─── PIN management ──────────────────────────────────────────────────────
-router.get("/pins", requirePinVerified, async (_req, res: Response) => {
+router.get("/pins", requirePinVerified, async (_req: any, res: any) => {
   const rows = await db
     .select({
       id: adminPins.id,
@@ -103,7 +101,7 @@ router.get("/pins", requirePinVerified, async (_req, res: Response) => {
   );
 });
 
-router.post("/pins", requirePinVerified, async (req, res: Response) => {
+router.post("/pins", requirePinVerified, async (req: any, res: any) => {
   const userId = userIdOf(req);
   const { pin, label } = (req.body ?? {}) as {
     pin?: string;
@@ -159,7 +157,7 @@ router.post("/pins", requirePinVerified, async (req, res: Response) => {
   }
 });
 
-router.patch("/pins/:id", requirePinVerified, async (req, res: Response) => {
+router.patch("/pins/:id", requirePinVerified, async (req: any, res: any) => {
   const id = Number(req.params.id);
 
   if (!Number.isFinite(id)) {
@@ -220,7 +218,7 @@ router.patch("/pins/:id", requirePinVerified, async (req, res: Response) => {
   }
 });
 
-router.delete("/pins/:id", requirePinVerified, async (req, res: Response) => {
+router.delete("/pins/:id", requirePinVerified, async (req: any, res: any) => {
   const id = Number(req.params.id);
 
   if (!Number.isFinite(id)) {
@@ -253,7 +251,7 @@ router.delete("/pins/:id", requirePinVerified, async (req, res: Response) => {
 // ─── Admin overview / users (PIN-gated) ──────────────────────────────────
 router.use(requirePinVerified);
 
-router.get("/overview", async (_req, res: Response) => {
+router.get("/overview", async (_req: any, res: any) => {
   const allAccounts = await db.select().from(accounts);
   const allHoldings = await db.select().from(holdings);
   const allOrders = await db.select().from(orders);
@@ -318,7 +316,7 @@ router.get("/overview", async (_req, res: Response) => {
   });
 });
 
-router.get("/users", async (_req, res: Response) => {
+router.get("/users", async (_req: any, res: any) => {
   const allAccounts = await db
     .select()
     .from(accounts)
@@ -374,7 +372,7 @@ router.get("/users", async (_req, res: Response) => {
   res.json(result);
 });
 
-router.get("/users/:userId", async (req, res: Response) => {
+router.get("/users/:userId", async (req: any, res: any) => {
   const { userId } = req.params;
 
   const [account] = await db
@@ -524,7 +522,7 @@ router.get("/users/:userId", async (req, res: Response) => {
   });
 });
 
-router.patch("/users/:userId", async (req, res: Response) => {
+router.patch("/users/:userId", async (req: any, res: any) => {
   const { userId } = req.params;
   const { displayName, isAdmin, isSuspended, email } = req.body ?? {};
 
@@ -579,7 +577,7 @@ router.patch("/users/:userId", async (req, res: Response) => {
   res.json({ ok: true });
 });
 
-router.patch("/users/:userId/cash", async (req, res: Response) => {
+router.patch("/users/:userId/cash", async (req: any, res: any) => {
   const { userId } = req.params;
   const { cashBalance, note } = req.body ?? {};
   const newBalance = Number(cashBalance);
@@ -628,7 +626,7 @@ router.patch("/users/:userId/cash", async (req, res: Response) => {
 });
 
 // Set / clear display overrides
-router.patch("/users/:userId/overrides", async (req, res: Response) => {
+router.patch("/users/:userId/overrides", async (req: any, res: any) => {
   const { userId } = req.params;
 
   const body = (req.body ?? {}) as Partial<{
@@ -697,7 +695,7 @@ router.patch("/users/:userId/overrides", async (req, res: Response) => {
   res.json({ ok: true });
 });
 
-router.post("/users/:userId/holdings", async (req, res: Response) => {
+router.post("/users/:userId/holdings", async (req: any, res: any) => {
   const { userId } = req.params;
   const { symbol, quantity, averageCost } = req.body ?? {};
 
@@ -747,7 +745,7 @@ router.post("/users/:userId/holdings", async (req, res: Response) => {
   res.json({ ok: true });
 });
 
-router.delete("/users/:userId/holdings/:symbol", async (req, res: Response) => {
+router.delete("/users/:userId/holdings/:symbol", async (req: any, res: any) => {
   const { userId, symbol } = req.params;
 
   await db
@@ -771,7 +769,7 @@ const ALLOWED_TX_TYPES = new Set<string>([
   "adjustment",
 ]);
 
-router.post("/users/:userId/transactions", async (req, res: Response) => {
+router.post("/users/:userId/transactions", async (req: any, res: any) => {
   const { userId } = req.params;
 
   const { type, description, amount, symbol, createdAt } = (req.body ?? {}) as {
@@ -857,7 +855,7 @@ router.post("/users/:userId/transactions", async (req, res: Response) => {
   });
 });
 
-router.patch("/transactions/:id", async (req, res: Response) => {
+router.patch("/transactions/:id", async (req: any, res: any) => {
   const id = Number(req.params.id);
 
   if (!Number.isFinite(id)) {
@@ -941,7 +939,7 @@ router.patch("/transactions/:id", async (req, res: Response) => {
   res.json({ ok: true });
 });
 
-router.delete("/transactions/:id", async (req, res: Response) => {
+router.delete("/transactions/:id", async (req: any, res: any) => {
   const id = Number(req.params.id);
 
   if (!Number.isFinite(id)) {
@@ -962,7 +960,7 @@ router.delete("/transactions/:id", async (req, res: Response) => {
   res.json({ ok: true });
 });
 
-router.delete("/users/:userId", async (req, res: Response) => {
+router.delete("/users/:userId", async (req: any, res: any) => {
   const { userId } = req.params;
 
   const [target] = await db
@@ -1003,7 +1001,7 @@ router.delete("/users/:userId", async (req, res: Response) => {
   res.json({ ok: true });
 });
 
-router.get("/orders", async (_req, res: Response) => {
+router.get("/orders", async (_req: any, res: any) => {
   const rows = (await db
     .select()
     .from(orders)
@@ -1048,7 +1046,7 @@ router.get("/orders", async (_req, res: Response) => {
   );
 });
 
-router.get("/transactions", async (_req, res: Response) => {
+router.get("/transactions", async (_req: any, res: any) => {
   const rows = (await db
     .select()
     .from(transactions)
