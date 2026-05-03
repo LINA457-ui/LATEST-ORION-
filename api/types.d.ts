@@ -1,0 +1,1 @@
+declare module "../artifacts/api-server/dist/index.js";
