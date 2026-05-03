@@ -7,8 +7,7 @@ import express, {
 import cors, { type CorsOptions } from "cors";
 import { createRequire } from "node:module";
 import router from "./routes/index.js";
-
-import { logger } from "./lib/logger";
+import { logger } from "./lib/logger.js";
 
 const require = createRequire(import.meta.url);
 const pinoHttp = require("pino-http") as any;
@@ -34,6 +33,7 @@ const corsOptions: CorsOptions = {
       return callback(null, true);
     }
 
+    console.log("❌ CORS blocked:", origin);
     return callback(new Error(`Blocked by CORS: ${origin}`));
   },
   credentials: true,
@@ -45,6 +45,9 @@ const corsOptions: CorsOptions = {
     "x-admin-pin-token",
   ],
 };
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 app.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader("Cache-Control", "no-store");
@@ -71,33 +74,6 @@ app.use(
   }),
 );
 
-app.use(cors(corsOptions));
-
-app.use((req: Request, res: Response, next: NextFunction): void => {
-  if (req.method === "OPTIONS") {
-    const origin = req.headers.origin;
-
-    if (origin && allowedOrigins.includes(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-    }
-
-    res.setHeader("Vary", "Origin");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    );
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Admin-Pin-Token, x-admin-pin-token",
-    );
-
-    res.sendStatus(204);
-    return;
-  }
-
-  next();
-});
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
