@@ -5,8 +5,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-      "dev": "tsx watch src/index.ts",
- "prebuild": "pnpm --dir ../../lib/db run build && node scripts/prepare-shared-libs.cjs"
+       "dev": "tsx watch src/index.ts",
+  "prebuild": "pnpm --dir ../../lib/db run build && node scripts/prepare-shared-libs.cjs",
   "build": "tsc -p tsconfig.json",
   "start": "node dist/index.js"
   },
