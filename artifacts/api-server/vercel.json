@@ -1,11 +1,11 @@
 {
   "version": 2,
   "buildCommand": "pnpm --filter @workspace/api-server build",
-  "outputDirectory": "dist",
+  "outputDirectory": "artifacts/api-server/dist",
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "dist/index.js"
+      "dest": "artifacts/api-server/dist/artifacts/api-server/src/index.js"
     }
   ]
 }
