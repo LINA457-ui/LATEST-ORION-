@@ -11,7 +11,7 @@
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "artifacts/api-server/dist/index.js"
+      "dest": "/artifacts/api-server/dist/index.js"
     }
   ]
 }
