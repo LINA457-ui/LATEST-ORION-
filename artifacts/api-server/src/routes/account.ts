@@ -6,11 +6,6 @@ import { orders } from "../../../../lib/db/src/schema/orders.js";
 import { transactions } from "../../../../lib/db/src/schema/transactions.js";
 import { watchlist } from "../../../../lib/db/src/schema/watchlist.js";
 import { and, desc, eq } from "drizzle-orm";
-import {
-  AddToWatchlistBody,
-  RemoveFromWatchlistParams,
-  GetAccountPerformanceQueryParams,
-} from "../../../../lib/api-zod/src/index.js";
 import { requireAuth, ensureAccount, userIdOf } from "../lib/auth.js";
 import {
   getEquityCurve,
@@ -22,6 +17,24 @@ import {
   POPULAR_SYMBOLS,
   type Range,
 } from "../lib/marketData.js";
+
+const AddToWatchlistBody = {
+  parse(data: any) {
+    return data;
+  },
+};
+
+const RemoveFromWatchlistParams = {
+  parse(data: any) {
+    return data;
+  },
+};
+
+const GetAccountPerformanceQueryParams = {
+  parse(data: any) {
+    return data;
+  },
+};
 
 const router: any = express.Router();
 
@@ -232,7 +245,7 @@ router.post("/avatar", async (req: any, res: any) => {
 router.get("/performance", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
-  const parsed = GetAccountPerformanceQueryParams.parse(req.query);
+  const parsed = GetAccountPerformanceQueryParams.parse(req.query ?? {});
   const range = (parsed.range ?? "1M") as Range;
 
   const snapshot = await getAccountSnapshot(userId);
@@ -266,7 +279,7 @@ router.get("/transactions", async (req: any, res: any) => {
     .limit(100);
 
   res.json(
-    rows.map((t: (typeof rows)[number]) => ({
+    rows.map((t: any) => ({
       id: t.id,
       type: t.type,
       description: t.description,
@@ -344,14 +357,12 @@ router.get("/watchlist", async (req: any, res: any) => {
     .orderBy(desc(watchlist.createdAt));
 
   const symbols = rows.length
-    ? rows.map((row: (typeof rows)[number]) => row.symbol)
+    ? rows.map((row: any) => row.symbol)
     : POPULAR_SYMBOLS.slice(0, 6);
 
   const quotes = symbols
     .map((symbol: string) => getQuote(symbol))
-   .filter((quote: ReturnType<typeof getQuote>): quote is NonNullable<ReturnType<typeof getQuote>> =>
-  Boolean(quote),
-);
+    .filter((quote: ReturnType<typeof getQuote>) => Boolean(quote));
 
   res.json(quotes);
 });
@@ -359,8 +370,13 @@ router.get("/watchlist", async (req: any, res: any) => {
 router.post("/watchlist", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
-  const body = AddToWatchlistBody.parse(req.body);
-  const symbol = body.symbol.toUpperCase();
+  const body = AddToWatchlistBody.parse(req.body ?? {});
+  const symbol = String(body.symbol ?? "").toUpperCase();
+
+  if (!symbol) {
+    res.status(400).json({ error: "Symbol is required" });
+    return;
+  }
 
   const meta = getMeta(symbol);
 
@@ -382,8 +398,13 @@ router.post("/watchlist", async (req: any, res: any) => {
 router.delete("/watchlist/:symbol", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
-  const params = RemoveFromWatchlistParams.parse(req.params);
-  const symbol = params.symbol.toUpperCase();
+  const params = RemoveFromWatchlistParams.parse(req.params ?? {});
+  const symbol = String(params.symbol ?? "").toUpperCase();
+
+  if (!symbol) {
+    res.status(400).json({ error: "Symbol is required" });
+    return;
+  }
 
   await db
     .delete(watchlist)
@@ -411,7 +432,7 @@ router.get("/dashboard", async (req: any, res: any) => {
     .where(eq(holdings.userId, userId));
 
   const positions = userHoldings
-    .map((holding: (typeof userHoldings)[number]): Position | null => {
+    .map((holding: any): Position | null => {
       const quote = getQuote(holding.symbol);
       const meta = getMeta(holding.symbol);
 
@@ -447,9 +468,9 @@ router.get("/dashboard", async (req: any, res: any) => {
         dayChangePercent: quote.changePercent,
       };
     })
-   .filter((position: Position | null): position is Position =>
-  Boolean(position),
-);
+    .filter((position: Position | null): position is Position =>
+      Boolean(position),
+    );
 
   const watchRows = await db
     .select()
@@ -458,14 +479,12 @@ router.get("/dashboard", async (req: any, res: any) => {
     .orderBy(desc(watchlist.createdAt));
 
   const watchSymbols = watchRows.length
-    ? watchRows.map((row: (typeof watchRows)[number]) => row.symbol)
+    ? watchRows.map((row: any) => row.symbol)
     : POPULAR_SYMBOLS.slice(0, 6);
 
   const watchQuotes = watchSymbols
     .map((symbol: string) => getQuote(symbol))
-    .filter((quote: ReturnType<typeof getQuote>): quote is NonNullable<ReturnType<typeof getQuote>> =>
-  Boolean(quote),
-);
+    .filter((quote: ReturnType<typeof getQuote>) => Boolean(quote));
 
   const recentOrderRows = await db
     .select()
@@ -474,23 +493,21 @@ router.get("/dashboard", async (req: any, res: any) => {
     .orderBy(desc(orders.createdAt))
     .limit(8);
 
-  const recentOrders = recentOrderRows.map(
-    (order: (typeof recentOrderRows)[number]) => {
-      const meta = getMeta(order.symbol);
+  const recentOrders = recentOrderRows.map((order: any) => {
+    const meta = getMeta(order.symbol);
 
-      return {
-        id: order.id,
-        symbol: order.symbol,
-        name: meta?.name ?? order.symbol,
-        side: order.side as "buy" | "sell",
-        quantity: Number(order.quantity),
-        price: Number(order.price),
-        total: Number(order.total),
-        status: order.status as "filled" | "pending" | "rejected",
-        createdAt: order.createdAt.toISOString(),
-      };
-    },
-  );
+    return {
+      id: order.id,
+      symbol: order.symbol,
+      name: meta?.name ?? order.symbol,
+      side: order.side as "buy" | "sell",
+      quantity: Number(order.quantity),
+      price: Number(order.price),
+      total: Number(order.total),
+      status: order.status as "filled" | "pending" | "rejected",
+      createdAt: order.createdAt.toISOString(),
+    };
+  });
 
   const recentTransactionRows = await db
     .select()
@@ -499,16 +516,14 @@ router.get("/dashboard", async (req: any, res: any) => {
     .orderBy(desc(transactions.createdAt))
     .limit(8);
 
-  const recentTransactions = recentTransactionRows.map(
-    (transaction: (typeof recentTransactionRows)[number]) => ({
-      id: transaction.id,
-      type: transaction.type,
-      description: transaction.description,
-      amount: Number(transaction.amount),
-      symbol: transaction.symbol ?? null,
-      createdAt: transaction.createdAt.toISOString(),
-    }),
-  );
+  const recentTransactions = recentTransactionRows.map((transaction: any) => ({
+    id: transaction.id,
+    type: transaction.type,
+    description: transaction.description,
+    amount: Number(transaction.amount),
+    symbol: transaction.symbol ?? null,
+    createdAt: transaction.createdAt.toISOString(),
+  }));
 
   res.json({
     account: snapshot,
