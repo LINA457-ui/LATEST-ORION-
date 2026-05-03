@@ -1,8 +1,8 @@
-import { Router, type Request, type Response } from "express";
+import express from "express";
 
-const router = Router();
+const router: any = express.Router();
 
-router.get("/healthz", (_req: Request, res: Response): void => {
+router.get("/healthz", (_req: any, res: any) => {
   res.status(200).json({
     status: "ok",
   });
