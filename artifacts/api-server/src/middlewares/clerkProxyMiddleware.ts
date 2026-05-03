@@ -1,5 +1,6 @@
 import { createProxyMiddleware } from "http-proxy-middleware";
 import type { Request, Response, NextFunction, RequestHandler } from "express";
+import type { ClientRequest } from "node:http";
 
 const CLERK_FAPI = "https://frontend-api.clerk.dev";
 
@@ -17,12 +18,10 @@ export function clerkProxyMiddleware(): RequestHandler {
   const isProduction = process.env.NODE_ENV === "production";
   const secretKey = process.env.CLERK_SECRET_KEY;
 
-  // ✅ Local/dev mode: do nothing
   if (!isProduction) {
     return noopMiddleware;
   }
 
-  // ✅ Production without Clerk secret: do nothing instead of crashing
   if (!secretKey) {
     console.warn("[Clerk Proxy] CLERK_SECRET_KEY is missing. Clerk proxy disabled.");
     return noopMiddleware;
@@ -37,7 +36,7 @@ export function clerkProxyMiddleware(): RequestHandler {
     },
 
     on: {
-      proxyReq: (proxyReq, req) => {
+      proxyReq: (proxyReq: ClientRequest, req: Request) => {
         const protocol =
           (req.headers["x-forwarded-proto"] as string) ||
           req.protocol ||
@@ -63,19 +62,17 @@ export function clerkProxyMiddleware(): RequestHandler {
         }
       },
 
-      error: (err, _req, res) => {
+      error: (err: Error, _req: Request, res: Response) => {
         console.error("[Clerk Proxy] Proxy error:", err);
 
-        const response = res as Response;
-
-        if (!response.headersSent) {
-          response.status(502).json({
+        if (!res.headersSent) {
+          res.status(502).json({
             error: "Clerk proxy failed",
           });
           return;
         }
 
-        response.end();
+        res.end();
       },
     },
   }) as RequestHandler;
