@@ -1,4 +1,5 @@
 import { useUser } from "@clerk/clerk-react";
+import { useQuery } from "@tanstack/react-query";
 import { formatCurrency, formatChange } from "@/lib/format";
 import {
   Card,
@@ -22,9 +23,7 @@ import {
   ArrowRight,
   ChevronUp,
   ChevronDown,
-  Activity,
   Clock,
-  Briefcase,
   ArrowDownRight,
   ArrowUpRight,
   Coins,
@@ -33,168 +32,6 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-const dummySummary = {
-  account: {
-    totalEquity: 400000000,
-    dayChange: 2845000,
-    dayChangePercent: 0.72,
-    portfolioValue: 396000000,
-    cashBalance: 4000000,
-    buyingPower: 400000000,
-  },
-
-  equityCurve: {
-    range: "1M",
-    points: [
-      { t: "2026-04-01", v: 372000000 },
-      { t: "2026-04-07", v: 378500000 },
-      { t: "2026-04-14", v: 384200000 },
-      { t: "2026-04-21", v: 391800000 },
-      { t: "2026-05-01", v: 400000000 },
-    ],
-  },
-
-  positions: [
-    {
-      id: "pos-1",
-      symbol: "AAPL",
-      quantity: 1200,
-      marketValue: 23810400,
-      dayChangePercent: 1.19,
-    },
-    {
-      id: "pos-2",
-      symbol: "MSFT",
-      quantity: 850,
-      marketValue: 36653700,
-      dayChangePercent: 0.98,
-    },
-    {
-      id: "pos-3",
-      symbol: "NVDA",
-      quantity: 2500,
-      marketValue: 30720000,
-      dayChangePercent: 3.12,
-    },
-    {
-      id: "pos-4",
-      symbol: "AMZN",
-      quantity: 1600,
-      marketValue: 29976000,
-      dayChangePercent: 0.77,
-    },
-    {
-      id: "pos-5",
-      symbol: "TSLA",
-      quantity: 900,
-      marketValue: 22041900,
-      dayChangePercent: -0.87,
-    },
-  ],
-
-  recentOrders: [
-    {
-      id: "ord-1",
-      side: "buy",
-      symbol: "NVDA",
-      quantity: 50,
-      price: 122.88,
-      total: 6144,
-      createdAt: "2026-05-01",
-    },
-    {
-      id: "ord-2",
-      side: "buy",
-      symbol: "AAPL",
-      quantity: 25,
-      price: 198.42,
-      total: 4960.5,
-      createdAt: "2026-04-30",
-    },
-    {
-      id: "ord-3",
-      side: "sell",
-      symbol: "TSLA",
-      quantity: 10,
-      price: 244.91,
-      total: 2449.1,
-      createdAt: "2026-04-29",
-    },
-  ],
-
-  recentTransactions: [
-    {
-      id: "txn-1",
-      type: "deposit",
-      amount: 4000000,
-      description: "Account funding deposit",
-      createdAt: "2026-05-01",
-    },
-    {
-      id: "txn-2",
-      type: "dividend",
-      amount: 125000,
-      description: "Quarterly dividend payout",
-      createdAt: "2026-04-28",
-    },
-    {
-      id: "txn-3",
-      type: "fee",
-      amount: -15000,
-      description: "Trading service fee",
-      createdAt: "2026-04-27",
-    },
-  ],
-
-  indices: [
-    {
-      id: "idx-1",
-      name: "S&P 500",
-      symbol: "SPX",
-      value: 5218.35,
-      changePercent: 0.82,
-    },
-    {
-      id: "idx-2",
-      name: "Nasdaq Composite",
-      symbol: "IXIC",
-      value: 16442.2,
-      changePercent: 1.14,
-    },
-    {
-      id: "idx-3",
-      name: "Dow Jones",
-      symbol: "DJI",
-      value: 38672.91,
-      changePercent: -0.18,
-    },
-  ],
-
-  news: [
-    {
-      id: "news-1",
-      source: "Orion Markets",
-      publishedAt: "2026-05-01",
-      headline: "Technology stocks push portfolios higher as AI momentum continues.",
-      symbols: ["NVDA", "MSFT"],
-    },
-    {
-      id: "news-2",
-      source: "Market Desk",
-      publishedAt: "2026-04-30",
-      headline: "Apple gains after stronger services revenue expectations.",
-      symbols: ["AAPL"],
-    },
-    {
-      id: "news-3",
-      source: "Equity Watch",
-      publishedAt: "2026-04-29",
-      headline: "Tesla slips as traders review delivery and margin outlook.",
-      symbols: ["TSLA"],
-    },
-  ],
-};
-
 function safeDate(value: string) {
   return new Date(value);
 }
@@ -202,22 +39,55 @@ function safeDate(value: string) {
 export default function DashboardPage() {
   const { user } = useUser();
 
-  const account = dummySummary.account;
-  const equityCurve = dummySummary.equityCurve;
-  const positions = dummySummary.positions;
-  const recentOrders = dummySummary.recentOrders;
-  const recentTransactions = dummySummary.recentTransactions;
-  const indices = dummySummary.indices;
-  const news = dummySummary.news;
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: async () => {
+      const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
+
+      const res = await fetch(`${baseUrl}/api/account/dashboard`, {
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to load dashboard");
+      }
+
+      return res.json();
+    },
+  });
+
+  if (isLoading) {
+    return <div className="p-6">Loading dashboard...</div>;
+  }
+
+  if (isError || !data?.account) {
+    return (
+      <div className="p-6">
+        <h2 className="text-xl font-bold">Dashboard unavailable</h2>
+        <p className="text-muted-foreground mt-2">
+          Could not load your dashboard data.
+        </p>
+      </div>
+    );
+  }
+
+  const account = data.account;
+  const equityCurve = data.equityCurve ?? { range: "1M", points: [] };
+  const positions = data.positions ?? [];
+  const recentOrders = data.recentOrders ?? [];
+  const recentTransactions = data.recentTransactions ?? [];
+  const indices = data.indices ?? [];
+  const news = data.news ?? [];
 
   const displayName =
     user?.fullName ||
     user?.username ||
     user?.firstName ||
     user?.primaryEmailAddress?.emailAddress ||
+    account.displayName ||
     "Investor";
 
-  const isPositive = account.dayChange >= 0;
+  const isPositive = Number(account.dayChange ?? 0) >= 0;
 
   return (
     <div className="space-y-8 pb-8">
@@ -405,39 +275,45 @@ export default function DashboardPage() {
 
           <CardContent className="flex-1">
             <div className="space-y-4 mt-2">
-              {positions.map((pos) => (
-                <div
-                  key={pos.id}
-                  className="flex items-center justify-between"
-                >
-                  <div>
-                    <Link
-                      href={`/markets/${pos.symbol}`}
-                      className="font-bold hover:underline"
-                    >
-                      {pos.symbol}
-                    </Link>
-                    <div className="text-xs text-muted-foreground">
-                      {pos.quantity.toLocaleString()} shares
+              {positions.length ? (
+                positions.map((pos: any) => (
+                  <div
+                    key={pos.id}
+                    className="flex items-center justify-between"
+                  >
+                    <div>
+                      <Link
+                        href={`/markets/${pos.symbol}`}
+                        className="font-bold hover:underline"
+                      >
+                        {pos.symbol}
+                      </Link>
+                      <div className="text-xs text-muted-foreground">
+                        {Number(pos.quantity).toLocaleString()} shares
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="text-right">
-                    <div className="font-medium">
-                      {formatCurrency(pos.marketValue)}
-                    </div>
-                    <div
-                      className={`text-xs font-medium ${
-                        pos.dayChangePercent >= 0
-                          ? "text-success"
-                          : "text-destructive"
-                      }`}
-                    >
-                      {formatChange(pos.dayChangePercent, true)}
+                    <div className="text-right">
+                      <div className="font-medium">
+                        {formatCurrency(pos.marketValue)}
+                      </div>
+                      <div
+                        className={`text-xs font-medium ${
+                          pos.dayChangePercent >= 0
+                            ? "text-success"
+                            : "text-destructive"
+                        }`}
+                      >
+                        {formatChange(pos.dayChangePercent, true)}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No positions yet.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -459,62 +335,68 @@ export default function DashboardPage() {
 
           <CardContent>
             <div className="divide-y">
-              {recentOrders.map((o) => {
-                const isBuy = o.side === "buy";
+              {recentOrders.length ? (
+                recentOrders.map((o: any) => {
+                  const isBuy = o.side === "buy";
 
-                return (
-                  <div
-                    key={o.id}
-                    className="flex items-center justify-between py-3 first:pt-1"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          isBuy
-                            ? "bg-success/10 text-success"
-                            : "bg-destructive/10 text-destructive"
-                        }`}
-                      >
-                        {isBuy ? (
-                          <ArrowDownRight className="w-4 h-4" />
-                        ) : (
-                          <ArrowUpRight className="w-4 h-4" />
-                        )}
+                  return (
+                    <div
+                      key={o.id}
+                      className="flex items-center justify-between py-3 first:pt-1"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            isBuy
+                              ? "bg-success/10 text-success"
+                              : "bg-destructive/10 text-destructive"
+                          }`}
+                        >
+                          {isBuy ? (
+                            <ArrowDownRight className="w-4 h-4" />
+                          ) : (
+                            <ArrowUpRight className="w-4 h-4" />
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="font-bold flex items-center gap-2">
+                            <span className="uppercase text-xs font-semibold tracking-wide">
+                              {o.side}
+                            </span>
+                            <Link
+                              href={`/markets/${o.symbol}`}
+                              className="hover:underline"
+                            >
+                              {o.symbol}
+                            </Link>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {o.quantity} shares @ {formatCurrency(o.price)}
+                          </div>
+                        </div>
                       </div>
 
-                      <div>
-                        <div className="font-bold flex items-center gap-2">
-                          <span className="uppercase text-xs font-semibold tracking-wide">
-                            {o.side}
-                          </span>
-                          <Link
-                            href={`/markets/${o.symbol}`}
-                            className="hover:underline"
-                          >
-                            {o.symbol}
-                          </Link>
+                      <div className="text-right">
+                        <div className="font-medium">
+                          {formatCurrency(o.total)}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {o.quantity} shares @ {formatCurrency(o.price)}
+                        <div className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+                          <Clock className="w-3 h-3" />
+                          {safeDate(o.createdAt).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </div>
                       </div>
                     </div>
-
-                    <div className="text-right">
-                      <div className="font-medium">
-                        {formatCurrency(o.total)}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
-                        <Clock className="w-3 h-3" />
-                        {safeDate(o.createdAt).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <p className="py-3 text-sm text-muted-foreground">
+                  No recent orders.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -534,60 +416,66 @@ export default function DashboardPage() {
 
           <CardContent>
             <div className="divide-y">
-              {recentTransactions.map((t) => {
-                const amountPositive = t.amount >= 0;
-                const Icon =
-                  t.type === "deposit"
-                    ? Banknote
-                    : t.type === "dividend"
-                    ? Coins
-                    : Receipt;
+              {recentTransactions.length ? (
+                recentTransactions.map((t: any) => {
+                  const amountPositive = Number(t.amount) >= 0;
+                  const Icon =
+                    t.type === "deposit"
+                      ? Banknote
+                      : t.type === "dividend"
+                      ? Coins
+                      : Receipt;
 
-                return (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between py-3 first:pt-1"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          amountPositive
-                            ? "bg-success/10 text-success"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        <Icon className="w-4 h-4" />
+                  return (
+                    <div
+                      key={t.id}
+                      className="flex items-center justify-between py-3 first:pt-1"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            amountPositive
+                              ? "bg-success/10 text-success"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </div>
+
+                        <div>
+                          <div className="font-medium text-sm capitalize">
+                            {t.type}
+                          </div>
+                          <div className="text-xs text-muted-foreground line-clamp-1">
+                            {t.description}
+                          </div>
+                        </div>
                       </div>
 
-                      <div>
-                        <div className="font-medium text-sm capitalize">
-                          {t.type}
+                      <div className="text-right">
+                        <div
+                          className={`font-semibold ${
+                            amountPositive ? "text-success" : "text-foreground"
+                          }`}
+                        >
+                          {amountPositive ? "+" : ""}
+                          {formatCurrency(t.amount)}
                         </div>
-                        <div className="text-xs text-muted-foreground line-clamp-1">
-                          {t.description}
+                        <div className="text-xs text-muted-foreground">
+                          {safeDate(t.createdAt).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </div>
                       </div>
                     </div>
-
-                    <div className="text-right">
-                      <div
-                        className={`font-semibold ${
-                          amountPositive ? "text-success" : "text-foreground"
-                        }`}
-                      >
-                        {amountPositive ? "+" : ""}
-                        {formatCurrency(t.amount)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {safeDate(t.createdAt).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <p className="py-3 text-sm text-muted-foreground">
+                  No recent transactions.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -606,9 +494,9 @@ export default function DashboardPage() {
 
           <CardContent>
             <div className="divide-y">
-              {indices.map((idx) => (
+              {indices.map((idx: any) => (
                 <div
-                  key={idx.id}
+                  key={idx.id ?? idx.symbol}
                   className="flex items-center justify-between py-3 first:pt-1"
                 >
                   <div>
@@ -620,7 +508,7 @@ export default function DashboardPage() {
 
                   <div className="text-right">
                     <div className="font-medium">
-                      {idx.value.toLocaleString()}
+                      {Number(idx.value).toLocaleString()}
                     </div>
                     <div
                       className={`text-sm font-medium ${
@@ -645,14 +533,16 @@ export default function DashboardPage() {
 
           <CardContent>
             <div className="space-y-4">
-              {news.map((item) => (
-                <div key={item.id} className="group">
+              {news.map((item: any) => (
+                <div key={item.id ?? item.headline} className="group">
                   <div className="text-xs text-muted-foreground mb-1 flex items-center gap-2">
                     <span className="font-medium text-foreground">
                       {item.source}
                     </span>
                     <span>•</span>
-                    <span>{safeDate(item.publishedAt).toLocaleDateString()}</span>
+                    <span>
+                      {safeDate(item.publishedAt).toLocaleDateString()}
+                    </span>
                   </div>
 
                   <a
@@ -663,7 +553,7 @@ export default function DashboardPage() {
                   </a>
 
                   <div className="flex gap-1 mt-2">
-                    {item.symbols.map((sym) => (
+                    {(item.symbols ?? []).map((sym: string) => (
                       <Badge
                         key={sym}
                         variant="secondary"
@@ -682,9 +572,9 @@ export default function DashboardPage() {
 
       <div className="rounded-xl border bg-muted/30 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="font-semibold">Orion account is fully loaded</h3>
+          <h3 className="font-semibold">Orion account is fully connected</h3>
           <p className="text-sm text-muted-foreground">
-            Dashboard data is hardcoded for demo stability while keeping the UI realistic.
+            Dashboard data is now loaded from your backend account endpoint.
           </p>
         </div>
 
