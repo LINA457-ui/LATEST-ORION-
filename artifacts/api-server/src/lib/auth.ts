@@ -13,8 +13,23 @@ function asAuthed(req: any): AuthedRequest {
   return req as AuthedRequest;
 }
 
+function getHeader(req: any, name: string) {
+  return req.headers?.[name] || req.headers?.[name.toLowerCase()];
+}
+
 export function userIdOf(req: any): string {
-  return asAuthed(req).userId || DEV_USER_ID;
+  const userId =
+    asAuthed(req).userId ||
+    asAuthed(req).auth?.userId ||
+    getHeader(req, "x-clerk-user-id") ||
+    req.body?.userId ||
+    req.body?.clerkUserId;
+
+  if (userId) return String(userId);
+
+  if (process.env.NODE_ENV !== "production") return DEV_USER_ID;
+
+  throw new Error("Unauthorized: missing Clerk user id");
 }
 
 export async function ensureAccount(
@@ -43,7 +58,7 @@ export async function ensureAccount(
       .update(accounts)
       .set({
         ...(email ? { email } : {}),
-        isAdmin: true,
+        isAdmin: isFirstUser,
       })
       .where(eq(accounts.userId, userId));
 
@@ -64,7 +79,7 @@ export async function ensureAccount(
         displayName: displayName ?? DEV_NAME,
         email: email ?? null,
         cashBalance: "100000.00",
-        isAdmin: isFirstUser || true,
+        isAdmin: isFirstUser,
       })
       .onConflictDoNothing()
       .returning();
@@ -81,25 +96,24 @@ export async function ensureAccount(
   }
 }
 
-export function requireAuth(req: any, _res: any, next: any) {
-  asAuthed(req).userId = DEV_USER_ID;
-  next();
+export function requireAuth(req: any, res: any, next: any) {
+  try {
+    asAuthed(req).userId = userIdOf(req);
+    next();
+  } catch {
+    res.status(401).json({ error: "Unauthorized" });
+  }
 }
 
 export async function requireAdmin(req: any, res: any, next: any) {
   try {
     const userId = userIdOf(req);
-    const account = await ensureAccount(userId, DEV_NAME, DEV_EMAIL);
+    const account = await ensureAccount(userId, req.body?.displayName, req.body?.email);
 
-    if (!account) {
-      res.status(401).json({ error: "Unauthorized" });
+    if (!account || !account.isAdmin) {
+      res.status(403).json({ error: "Admin access required" });
       return;
     }
-
-    await db
-      .update(accounts)
-      .set({ isAdmin: true })
-      .where(eq(accounts.userId, userId));
 
     asAuthed(req).userId = userId;
     next();
