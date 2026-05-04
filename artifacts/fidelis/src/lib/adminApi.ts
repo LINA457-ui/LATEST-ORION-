@@ -52,16 +52,15 @@ async function getClerkAuth(): Promise<{
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const { userId, token } = await getClerkAuth();
 
-  if (!userId) {
-    throw new Error("Unauthorized");
+  if (!userId || !token) {
+    throw new Error("Unauthorized: missing Clerk session token");
   }
 
   const isFormData = options.body instanceof FormData;
 
   const headers: HeadersInit = {
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
-   
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    Authorization: `Bearer ${token}`,
     ...(options.headers || {}),
   };
 
