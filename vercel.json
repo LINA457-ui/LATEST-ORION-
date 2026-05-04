@@ -4,10 +4,7 @@
   "buildCommand": "pnpm --dir artifacts/api-server build",
   "functions": {
     "api/index.js": {
-      "includeFiles": [
-        "artifacts/api-server/dist/**",
-        "lib/db/dist/**"
-      ]
+      "includeFiles": "{artifacts/api-server/dist/**,lib/db/dist/**}"
     }
   },
   "builds": [
