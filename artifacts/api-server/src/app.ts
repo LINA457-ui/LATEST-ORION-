@@ -1,5 +1,6 @@
 import express from "express";
 import { createRequire } from "node:module";
+import { clerkMiddleware } from "@clerk/express";
 import { logger } from "./lib/logger.js";
 
 const require = createRequire(import.meta.url);
@@ -25,6 +26,7 @@ function getCorsOrigin(origin?: string) {
 
   try {
     const url = new URL(origin);
+
     if (url.protocol === "https:" && url.hostname.endsWith(".vercel.app")) {
       return origin;
     }
@@ -52,22 +54,25 @@ app.use((req: any, res: any, next: any) => {
       "Content-Type",
       "Accept",
       "Authorization",
+      "X-Clerk-User-Id",
+      "x-clerk-user-id",
       "X-Admin-Pin",
       "x-admin-pin",
       "X-Admin-Pin-Token",
       "x-admin-pin-token",
-    ].join(", ")
+    ].join(", "),
   );
 
   res.setHeader(
     "Access-Control-Allow-Methods",
-    "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+    "GET,POST,PUT,PATCH,DELETE,OPTIONS",
   );
 
   res.setHeader("Access-Control-Max-Age", "86400");
 
   if (req.method === "OPTIONS") {
-    return res.status(204).send("");
+    res.status(204).send("");
+    return;
   }
 
   next();
@@ -95,6 +100,14 @@ app.use(
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// ✅ Clerk must run before protected /api routes.
+app.use(
+  clerkMiddleware({
+    secretKey: process.env.CLERK_SECRET_KEY,
+    publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+  }),
+);
 
 app.get("/", (_req: any, res: any) => {
   res.status(200).json({
@@ -124,7 +137,7 @@ app.use("/api", async (req: any, res: any, next: any) => {
   } catch (err) {
     console.error("🔥 Failed to load API router:", err);
 
-    return res.status(500).json({
+    res.status(500).json({
       error: "API router failed to load",
       message: err instanceof Error ? err.message : "Unknown router error",
     });
