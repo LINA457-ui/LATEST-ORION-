@@ -1,0 +1,25 @@
+import { db } from "@workspace/db";
+import { accounts } from "@workspace/db/schema";
+import { eq } from "drizzle-orm";
+export async function syncClerkUserToDb(userId) {
+    const [existing] = await db
+        .select()
+        .from(accounts)
+        .where(eq(accounts.userId, userId))
+        .limit(1);
+    if (existing)
+        return existing;
+    const [created] = await db
+        .insert(accounts)
+        .values({
+        userId,
+        displayName: "User",
+        email: "user@email.com",
+        avatarUrl: null,
+        cashBalance: "100000.00",
+        isAdmin: false,
+        isSuspended: false,
+    })
+        .returning();
+    return created;
+}
