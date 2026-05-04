@@ -1,6 +1,3 @@
-export default async function handler(req, res) {
-  const mod = await import("../artifacts/api-server/dist/app.js");
-  const app = mod.default;
+import app from "../artifacts/api-server/dist/app.js";
 
-  return app(req, res);
-}
+export default app;
