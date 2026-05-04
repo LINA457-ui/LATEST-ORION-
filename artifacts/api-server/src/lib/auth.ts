@@ -38,19 +38,37 @@ function getUserIdFromBearerToken(req: any): string | null {
 }
 
 export function userIdOf(req: any): string {
-  const userId =
-    asAuthed(req).userId ||
-    asAuthed(req).auth?.userId ||
+  // 1. Direct header (dev / fallback)
+  const headerUserId =
     getHeader(req, "x-clerk-user-id") ||
-    getUserIdFromBearerToken(req) ||
-    req.body?.userId ||
-    req.body?.clerkUserId;
+    getHeader(req, "X-Clerk-User-Id");
 
-  if (userId) return String(userId);
+  if (headerUserId) return String(headerUserId);
+
+  // 2. Authorization token (Clerk JWT)
+  const authHeader = getHeader(req, "authorization");
+
+  if (authHeader && String(authHeader).startsWith("Bearer ")) {
+    const token = String(authHeader).replace("Bearer ", "");
+
+    try {
+      const parts = token.split(".");
+      if (parts.length !== 3) throw new Error("Invalid JWT");
+
+      const payload = JSON.parse(
+        Buffer.from(parts[1], "base64").toString("utf8"),
+      );
+
+      if (payload?.sub) {
+        return payload.sub;
+      }
+    } catch (err) {
+      console.error("[AUTH ERROR] Failed to parse token:", err);
+    }
+  }
 
   throw new Error("Unauthorized: missing Clerk user id");
 }
-
 export async function ensureAccount(
   userId: string,
   displayName?: string,
