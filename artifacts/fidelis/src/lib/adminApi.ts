@@ -60,7 +60,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   const headers: HeadersInit = {
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
-    "x-clerk-user-id": userId,
+   
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {}),
   };
