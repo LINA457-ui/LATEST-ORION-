@@ -1,25 +1,16 @@
-{
-  "version": 2,
-  "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm --dir artifacts/api-server build",
-  "builds": [
-    {
-      "src": "api/index.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "artifacts/api-server/dist/**",
-          "lib/db/dist/**",
-          "artifacts/api-server/package.json",
-          "lib/db/package.json"
-        ]
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/api/index.js"
-    }
-  ]
+export default async function handler(req, res) {
+  try {
+    const mod = await import("../artifacts/api-server/dist/app.js");
+    const app = mod.default;
+
+    return app(req, res);
+  } catch (err) {
+    console.error("API handler crashed:", err);
+
+    return res.status(500).json({
+      error: "API handler crashed",
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : null,
+    });
+  }
 }
