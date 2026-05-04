@@ -1,5 +1,5 @@
-import { db } from "../../../../lib/db/src/index.js";
-import { accounts } from "../../../../lib/db/src/schema/accounts.js";
+import { db } from "@workspace/db";
+import { accounts } from "@workspace/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { createAccountWithSeed } from "./seedPortfolio.js";
 

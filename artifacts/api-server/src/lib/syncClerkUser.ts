@@ -1,5 +1,5 @@
-import { db } from "../../../../lib/db/src/index.js";
-import { accounts } from "../../../../lib/db/src/schema/index.js";
+import { db } from "@workspace/db";
+import { accounts } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function syncClerkUserToDb(userId: string) {

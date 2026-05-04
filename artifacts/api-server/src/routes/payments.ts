@@ -1,7 +1,6 @@
 import express from "express";
-import { db } from "../../../../lib/db/src/index.js";
-import { accounts } from "../../../../lib/db/src/schema/accounts.js";
-import { transactions } from "../../../../lib/db/src/schema/transactions.js";
+import { db } from "@workspace/db";
+import { accounts, transactions } from "@workspace/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { ensureAccount, userIdOf } from "../lib/auth.js";
 

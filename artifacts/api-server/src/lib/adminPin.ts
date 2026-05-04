@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { db } from "../../../../lib/db/src/index.js";
-import { adminPins } from "../../../../lib/db/src/schema/adminPins.js";
+import { db } from "@workspace/db";
+import { adminPins } from "@workspace/db/schema";
 import { count } from "drizzle-orm";
 
 function requireSecret(): string {

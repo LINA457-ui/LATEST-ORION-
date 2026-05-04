@@ -2,8 +2,11 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "../..",
+    "rootDir": "src",
     "types": ["node"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "baseUrl": ".",
     "noImplicitAny": false,
     "declaration": false,
     "declarationMap": false,
@@ -14,9 +17,6 @@
     "noEmitOnError": false,
     "skipLibCheck": true
   },
-  "include": [
-    "src/**/*.ts",
-    "../../lib/db/src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "exclude": ["dist", "node_modules"]
 }

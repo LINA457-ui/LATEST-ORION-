@@ -1,6 +1,6 @@
 import express from "express";
-import { db } from "../../../../lib/db/src/index.js";
-import { holdings } from "../../../../lib/db/src/schema/holdings.js";
+import { db } from "@workspace/db";
+import { holdings } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAuth, userIdOf } from "../lib/auth.js";
 import { getMeta, getQuote } from "../lib/marketData.js";

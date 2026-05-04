@@ -1,11 +1,11 @@
-import { db } from "../../../../lib/db/src/index.js";
+import { db } from "@workspace/db";
 import {
   accounts,
   holdings,
   orders,
   transactions,
   watchlist,
-} from "../../../../lib/db/src/schema/index.js";
+} from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { POPULAR_SYMBOLS, UNIVERSE, getQuote } from "./marketData.js";
 
