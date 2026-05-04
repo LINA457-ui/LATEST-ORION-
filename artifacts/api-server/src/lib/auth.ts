@@ -13,11 +13,36 @@ function getHeader(req: any, name: string) {
   return req.headers?.[name] || req.headers?.[name.toLowerCase()];
 }
 
+function getUserIdFromBearerToken(req: any): string | null {
+  const authHeader = getHeader(req, "authorization");
+
+  if (!authHeader || !String(authHeader).startsWith("Bearer ")) {
+    return null;
+  }
+
+  const token = String(authHeader).replace("Bearer ", "").trim();
+  const payloadPart = token.split(".")[1];
+
+  if (!payloadPart) return null;
+
+  try {
+    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(
+      Buffer.from(normalized, "base64").toString("utf8"),
+    );
+
+    return payload?.sub ? String(payload.sub) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function userIdOf(req: any): string {
   const userId =
     asAuthed(req).userId ||
     asAuthed(req).auth?.userId ||
     getHeader(req, "x-clerk-user-id") ||
+    getUserIdFromBearerToken(req) ||
     req.body?.userId ||
     req.body?.clerkUserId;
 
@@ -44,8 +69,8 @@ export async function ensureAccount(
     .from(accounts);
 
   const isFirstUser = Number(count) === 0;
-
-  const safeDisplayName = displayName?.trim() || email?.split("@")[0] || "Investor";
+  const safeDisplayName =
+    displayName?.trim() || email?.split("@")[0] || "Investor";
 
   try {
     await createAccountWithSeed(userId, safeDisplayName);
@@ -67,7 +92,7 @@ export async function ensureAccount(
 
     return final;
   } catch (err) {
-    console.error("[ensureAccount] seeded creation failed; using flat fallback", err);
+    console.error("[ensureAccount] creation failed; using flat fallback", err);
 
     const [created] = await db
       .insert(accounts)
@@ -75,7 +100,7 @@ export async function ensureAccount(
         userId,
         displayName: safeDisplayName,
         email: email ?? null,
-        cashBalance: "100000.00",
+        cashBalance: "0.00",
         isAdmin: isFirstUser,
       })
       .onConflictDoNothing()
