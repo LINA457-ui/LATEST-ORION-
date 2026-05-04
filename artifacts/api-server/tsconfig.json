@@ -2,20 +2,21 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "../..",
     "types": ["node"],
     "noImplicitAny": false,
     "declaration": false,
     "declarationMap": false,
     "emitDeclarationOnly": false,
-
     "composite": false,
     "incremental": false,
     "noEmit": false,
     "noEmitOnError": false,
-
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "../../lib/db/src/**/*.ts"
+  ],
   "exclude": ["dist", "node_modules"]
 }
