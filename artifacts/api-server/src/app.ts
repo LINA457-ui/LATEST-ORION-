@@ -1,4 +1,5 @@
 import express from "express";
+import apiRouter from "./routes/index.js";
 import { createRequire } from "node:module";
 import { clerkMiddleware } from "@clerk/express";
 import { logger } from "./lib/logger.js";
@@ -130,19 +131,7 @@ app.get("/api/health", (_req: any, res: any) => {
   });
 });
 
-app.use("/api", async (req: any, res: any, next: any) => {
-  try {
-    const mod = await import("./routes/index.js");
-    return mod.default(req, res, next);
-  } catch (err) {
-    console.error("🔥 Failed to load API router:", err);
-
-    res.status(500).json({
-      error: "API router failed to load",
-      message: err instanceof Error ? err.message : "Unknown router error",
-    });
-  }
-});
+app.use("/api", apiRouter);
 
 app.use((_req: any, res: any) => {
   res.status(404).json({
