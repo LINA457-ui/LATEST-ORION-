@@ -20,23 +20,48 @@ async function waitForClerk() {
   return clerk;
 }
 
-async function getClerkToken(): Promise<string | null> {
+async function getClerkAuth(): Promise<{
+  userId: string | null;
+  token: string | null;
+}> {
   const clerk = await waitForClerk();
 
-  if (!clerk?.session) {
-    console.warn("No Clerk session found.");
-    return null;
+  if (!clerk) {
+    console.warn("Clerk not loaded yet.");
+    return { userId: null, token: null };
   }
 
-  return await clerk.session.getToken();
+  const session = clerk.session;
+
+  if (!session) {
+    console.warn("No Clerk session found.");
+    return { userId: null, token: null };
+  }
+
+  const token = await session.getToken();
+
+  const userId =
+    session.user?.id ||
+    clerk.user?.id ||
+    clerk.client?.sessions?.[0]?.user?.id ||
+    null;
+
+  return { userId, token };
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const clerkToken = await getClerkToken();
+  const { userId, token } = await getClerkAuth();
+
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const isFormData = options.body instanceof FormData;
 
   const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    ...(clerkToken ? { Authorization: `Bearer ${clerkToken}` } : {}),
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+    "x-clerk-user-id": userId,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {}),
   };
 
@@ -75,6 +100,10 @@ export const adminApi = {
     request("/api/account/sync", {
       method: "POST",
     }),
+
+  dashboard: () => request<any>("/api/account/dashboard"),
+
+  me: () => request<any>("/api/account/me"),
 
   check: () => request<{ isAdmin: boolean }>("/api/admin/check"),
 
@@ -115,15 +144,15 @@ export const adminApi = {
 
   deleteHolding: (userId: string, symbol: string) =>
     request(
-      `/api/admin/users/${encodeURIComponent(userId)}/holdings/${encodeURIComponent(
-        symbol
-      )}`,
+      `/api/admin/users/${encodeURIComponent(
+        userId,
+      )}/holdings/${encodeURIComponent(symbol)}`,
       {
         method: "DELETE",
-      }
+      },
     ),
 
-   createTransaction: (userId: string, data: any) =>
+  createTransaction: (userId: string, data: any) =>
     request(`/api/admin/users/${encodeURIComponent(userId)}/transactions`, {
       method: "POST",
       body: JSON.stringify(data),
@@ -140,16 +169,9 @@ export const adminApi = {
     }),
 
   uploadAvatar: (formData: FormData) =>
-    fetch(`${BASE}/api/account/avatar`, {
+    request("/api/account/avatar", {
       method: "POST",
-      credentials: "include",
       body: formData,
-    }).then(async (res) => {
-      if (!res.ok) {
-        throw new Error("Failed to upload avatar");
-      }
-
-      return res.json();
     }),
 
   transactions: () => request<any[]>("/api/admin/transactions"),
