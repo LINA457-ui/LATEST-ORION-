@@ -1,5 +1,6 @@
 import { useUser } from "@clerk/clerk-react";
 import { useQuery } from "@tanstack/react-query";
+import { adminApi } from "@/lib/adminApi";
 import { formatCurrency, formatChange } from "@/lib/format";
 import {
   Card,
@@ -37,24 +38,21 @@ function safeDate(value: string) {
 }
 
 export default function DashboardPage() {
-  const { user } = useUser();
+  const { user, isLoaded, isSignedIn } = useUser();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["dashboard"],
-    queryFn: async () => {
-      const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
-
-      const res = await fetch(`${baseUrl}/api/account/dashboard`, {
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to load dashboard");
-      }
-
-      return res.json();
-    },
+    queryFn: () => adminApi.dashboard(),
+    enabled: isLoaded && isSignedIn,
   });
+
+  if (!isLoaded) {
+    return <div className="p-6">Loading account...</div>;
+  }
+
+  if (!isSignedIn) {
+    return <div className="p-6">Please sign in to view your dashboard.</div>;
+  }
 
   if (isLoading) {
     return <div className="p-6">Loading dashboard...</div>;
@@ -574,7 +572,7 @@ export default function DashboardPage() {
         <div>
           <h3 className="font-semibold">Orion account is fully connected</h3>
           <p className="text-sm text-muted-foreground">
-            Dashboard data is now loaded from your backend account endpoint.
+            Dashboard data is now loaded from your authenticated backend account endpoint.
           </p>
         </div>
 
