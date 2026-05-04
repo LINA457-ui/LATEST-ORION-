@@ -10,7 +10,7 @@ const app: any = express();
 app.disable("x-powered-by");
 app.set("etag", false);
 
-const allowedOrigins = new Set<string>([
+const allowedOrigins = new Set([
   "http://localhost:5173",
   "http://localhost:5000",
   "https://www.investmentorion.com",
@@ -18,29 +18,31 @@ const allowedOrigins = new Set<string>([
   "https://latest-orion-api-server.vercel.app",
 ]);
 
-function isAllowedOrigin(origin?: string): boolean {
-  if (!origin) return false;
-  if (allowedOrigins.has(origin)) return true;
+function getCorsOrigin(origin?: string) {
+  if (!origin) return "*";
+
+  if (allowedOrigins.has(origin)) return origin;
 
   try {
     const url = new URL(origin);
-    return url.protocol === "https:" && url.hostname.endsWith(".vercel.app");
-  } catch {
-    return false;
-  }
+    if (url.protocol === "https:" && url.hostname.endsWith(".vercel.app")) {
+      return origin;
+    }
+  } catch {}
+
+  return "";
 }
 
 app.use((req: any, res: any, next: any) => {
-  const origin = req.headers?.origin as string | undefined;
+  const origin = req.headers.origin as string | undefined;
+  const corsOrigin = getCorsOrigin(origin);
 
-  res.setHeader("X-Debug-Cors", "working");
-  res.setHeader("Vary", "Origin");
-  res.setHeader("Cache-Control", "no-store");
-
-  if (isAllowedOrigin(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (corsOrigin) {
+    res.setHeader("Access-Control-Allow-Origin", corsOrigin);
   }
+
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
 
   res.setHeader(
     "Access-Control-Allow-Headers",
@@ -50,18 +52,22 @@ app.use((req: any, res: any, next: any) => {
       "Content-Type",
       "Accept",
       "Authorization",
+      "X-Admin-Pin",
+      "x-admin-pin",
       "X-Admin-Pin-Token",
       "x-admin-pin-token",
-    ].join(", "),
+    ].join(", ")
   );
 
   res.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "GET,POST,PUT,PATCH,DELETE,OPTIONS"
   );
 
+  res.setHeader("Access-Control-Max-Age", "86400");
+
   if (req.method === "OPTIONS") {
-    return res.status(204).end();
+    return res.status(204).send("");
   }
 
   next();
