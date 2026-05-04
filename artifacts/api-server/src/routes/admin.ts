@@ -1,10 +1,10 @@
 import express from "express";
 import { db } from "../../../../lib/db/src/index.js";
 import { accounts } from "../../../../lib/db/src/schema/accounts.js";
+import { adminPins } from "../../../../lib/db/src/schema/adminPins.js";
 import { holdings } from "../../../../lib/db/src/schema/holdings.js";
 import { orders } from "../../../../lib/db/src/schema/orders.js";
 import { transactions } from "../../../../lib/db/src/schema/transactions.js";
-import { watchlist } from "../../../../lib/db/src/schema/watchlist.js";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   requireAuth,
