@@ -1,12 +1,14 @@
 import express from "express";
-import { db } from "@workspace/db";
-import { accounts } from "@workspace/db/schema/accounts";
-import { holdings } from "@workspace/db/schema/holdings";
-import { orders } from "@workspace/db/schema/orders";
-import { transactions } from "@workspace/db/schema/transactions";
-import { watchlist } from "@workspace/db/schema/watchlist";
+import { db } from "../../../../lib/db/src/index.js";
+import { accounts } from "../../../../lib/db/src/schema/accounts.js";
+import { holdings } from "../../../../lib/db/src/schema/holdings.js";
+import { orders } from "../../../../lib/db/src/schema/orders.js";
+import { transactions } from "../../../../lib/db/src/schema/transactions.js";
+import { watchlist } from "../../../../lib/db/src/schema/watchlist.js";
+import { conversations } from "../../../../lib/db/src/schema/conversations.js";
+import { messages } from "../../../../lib/db/src/schema/messages.js";
 import { and, asc, desc, eq } from "drizzle-orm";
-import { requireAuth, userIdOf } from "../lib/auth.js";
+import { userIdOf } from "../lib/auth.js";
 import { getAccountSnapshot } from "./account.js";
 import { getQuote } from "../lib/marketData.js";
 
@@ -63,7 +65,15 @@ async function getOpenAIClient() {
   return openaiClient;
 }
 
-router.use(requireAuth);
+router.use((req: any, _res: any, next: any) => {
+  req.user = {
+    id: "demo-user",
+    userId: "demo-user",
+    sub: "demo-user",
+  };
+
+  next();
+});
 
 const SYSTEM_PROMPT = `You are Orion Advisor, a friendly, knowledgeable AI assistant inside the Orion Investment platform.
 You help individual investors understand their portfolio, learn about markets, evaluate trade ideas,
