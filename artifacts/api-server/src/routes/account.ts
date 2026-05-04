@@ -42,8 +42,6 @@ const router: any = express.Router();
 
 router.use(requireAuth);
 
-
-
 export type AccountSnapshot = {
   userId: string;
   displayName: string | null;
@@ -82,6 +80,12 @@ type Position = {
   dayChange: number;
   dayChangePercent: number;
 };
+
+function cleanText(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+}
 
 export async function getAccountSnapshot(
   userId: string,
@@ -189,12 +193,37 @@ router.get("/me", async (req: any, res: any) => {
 router.post("/sync", async (req: any, res: any) => {
   const userId = userIdOf(req);
 
-  const { email, displayName } = (req.body ?? {}) as {
+  const {
+    email,
+    displayName,
+    phoneNumber,
+    homeAddress,
+    mothersMaidenName,
+  } = (req.body ?? {}) as {
     email?: string;
     displayName?: string;
+    phoneNumber?: string;
+    homeAddress?: string;
+    mothersMaidenName?: string;
   };
 
-  await ensureAccount(userId, displayName, email);
+  const account = await ensureAccount(
+    userId,
+    cleanText(displayName) ?? undefined,
+    cleanText(email) ?? undefined,
+  );
+
+  await db
+    .update(accounts)
+    .set({
+      email: cleanText(email),
+      displayName: cleanText(displayName) ?? account.displayName,
+      phoneNumber: cleanText(phoneNumber),
+      homeAddress: cleanText(homeAddress),
+      mothersMaidenName: cleanText(mothersMaidenName),
+    })
+    .where(eq(accounts.userId, userId));
+
   res.json({ ok: true, userId });
 });
 
