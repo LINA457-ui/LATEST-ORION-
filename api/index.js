@@ -30,8 +30,17 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const mod = await import("../artifacts/api-server/dist/index.js");
-  const app = mod.default;
+  try {
+    const mod = await import("../artifacts/api-server/dist/index.js");
+    const app = mod.default;
 
-  return app(req, res);
+    return app(req, res);
+  } catch (err) {
+    console.error("API handler crashed:", err);
+
+    return res.status(500).json({
+      error: "API handler crashed",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
