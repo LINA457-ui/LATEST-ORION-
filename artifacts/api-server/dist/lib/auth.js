@@ -1,3 +1,4 @@
+import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { accounts } from "@workspace/db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -5,18 +6,12 @@ import { createAccountWithSeed } from "./seedPortfolio.js";
 function asAuthed(req) {
     return req;
 }
-function getHeader(req, name) {
-    return req.headers?.[name] || req.headers?.[name.toLowerCase()];
-}
 export function userIdOf(req) {
-    const userId = asAuthed(req).userId ||
-        asAuthed(req).auth?.userId ||
-        getHeader(req, "x-clerk-user-id") ||
-        req.body?.userId ||
-        req.body?.clerkUserId;
-    if (userId)
-        return String(userId);
-    throw new Error("Unauthorized: missing Clerk user id");
+    const { userId } = getAuth(req);
+    if (!userId) {
+        throw new Error("Unauthorized");
+    }
+    return userId;
 }
 export async function ensureAccount(userId, displayName, email) {
     const existing = await db
@@ -49,14 +44,14 @@ export async function ensureAccount(userId, displayName, email) {
         return final;
     }
     catch (err) {
-        console.error("[ensureAccount] seeded creation failed; using flat fallback", err);
+        console.error("[ensureAccount] creation failed; using flat fallback", err);
         const [created] = await db
             .insert(accounts)
             .values({
             userId,
             displayName: safeDisplayName,
             email: email ?? null,
-            cashBalance: "100000.00",
+            cashBalance: "0.00",
             isAdmin: isFirstUser,
         })
             .onConflictDoNothing()

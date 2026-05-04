@@ -1,5 +1,7 @@
 import express from "express";
+import apiRouter from "./routes/index.js";
 import { createRequire } from "node:module";
+import { clerkMiddleware, getAuth } from "@clerk/express";
 import { logger } from "./lib/logger.js";
 const require = createRequire(import.meta.url);
 const pinoHttp = require("pino-http");
@@ -15,7 +17,7 @@ const allowedOrigins = new Set([
 ]);
 function getCorsOrigin(origin) {
     if (!origin)
-        return "*";
+        return "";
     if (allowedOrigins.has(origin))
         return origin;
     try {
@@ -35,21 +37,12 @@ app.use((req, res, next) => {
     }
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Headers", [
-        "Origin",
-        "X-Requested-With",
-        "Content-Type",
-        "Accept",
-        "Authorization",
-        "X-Admin-Pin",
-        "x-admin-pin",
-        "X-Admin-Pin-Token",
-        "x-admin-pin-token",
-    ].join(", "));
+    res.setHeader("Access-Control-Allow-Headers", "origin, x-requested-with, content-type, accept, authorization, x-clerk-user-id, x-admin-pin, x-admin-pin-token");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
     res.setHeader("Access-Control-Max-Age", "86400");
     if (req.method === "OPTIONS") {
-        return res.status(204).send("");
+        res.status(204).send("");
+        return;
     }
     next();
 });
@@ -64,14 +57,16 @@ app.use(pinoHttp({
             };
         },
         res(res) {
-            return {
-                statusCode: res.statusCode,
-            };
+            return { statusCode: res.statusCode };
         },
     },
 }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(clerkMiddleware({
+    secretKey: process.env.CLERK_SECRET_KEY,
+    publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+}));
 app.get("/", (_req, res) => {
     res.status(200).json({
         ok: true,
@@ -90,19 +85,16 @@ app.get("/api/health", (_req, res) => {
         service: "latest-orion-api-server",
     });
 });
-app.use("/api", async (req, res, next) => {
-    try {
-        const mod = await import("./routes/index.js");
-        return mod.default(req, res, next);
-    }
-    catch (err) {
-        console.error("🔥 Failed to load API router:", err);
-        return res.status(500).json({
-            error: "API router failed to load",
-            message: err instanceof Error ? err.message : "Unknown router error",
-        });
-    }
+app.get("/api/debug", (req, res) => {
+    const auth = getAuth(req);
+    console.log("AUTH DEBUG:", auth);
+    res.status(200).json({
+        userId: auth.userId,
+        sessionId: auth.sessionId,
+        actor: auth.actor ?? null,
+    });
 });
+app.use("/api", apiRouter);
 app.use((_req, res) => {
     res.status(404).json({
         error: "Route not found",
