@@ -1,7 +1,7 @@
 import express from "express";
 import apiRouter from "./routes/index.js";
 import { createRequire } from "node:module";
-import { clerkMiddleware } from "@clerk/express";
+import { clerkMiddleware, getAuth } from "@clerk/express";
 import { logger } from "./lib/logger.js";
 
 const require = createRequire(import.meta.url);
@@ -46,17 +46,14 @@ app.use((req: any, res: any, next: any) => {
 
   res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Credentials", "true");
-
   res.setHeader(
     "Access-Control-Allow-Headers",
     "origin, x-requested-with, content-type, accept, authorization, x-clerk-user-id, x-admin-pin, x-admin-pin-token",
   );
-
   res.setHeader(
     "Access-Control-Allow-Methods",
     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
   );
-
   res.setHeader("Access-Control-Max-Age", "86400");
 
   if (req.method === "OPTIONS") {
@@ -79,9 +76,7 @@ app.use(
         };
       },
       res(res: any) {
-        return {
-          statusCode: res.statusCode,
-        };
+        return { statusCode: res.statusCode };
       },
     },
   }),
@@ -115,6 +110,18 @@ app.get("/api/health", (_req: any, res: any) => {
   res.status(200).json({
     ok: true,
     service: "latest-orion-api-server",
+  });
+});
+
+app.get("/api/debug", (req: any, res: any) => {
+  const auth = getAuth(req);
+
+  console.log("AUTH DEBUG:", auth);
+
+  res.status(200).json({
+    userId: auth.userId,
+    sessionId: auth.sessionId,
+    actor: auth.actor ?? null,
   });
 });
 
