@@ -7,9 +7,11 @@ export default async function handler(req, res) {
     "http://localhost:5173",
   ];
 
-  if (allowedOrigins.includes(origin)) {
+  if (origin && allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "*");
   }
 
   res.setHeader("Vary", "Origin");
@@ -25,7 +27,7 @@ export default async function handler(req, res) {
   );
 
   if (req.method === "OPTIONS") {
-    return res.status(204).end();
+    return res.status(200).end();
   }
 
   const mod = await import("../artifacts/api-server/dist/index.js");
