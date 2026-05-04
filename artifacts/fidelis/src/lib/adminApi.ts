@@ -38,7 +38,7 @@ async function getClerkAuth(): Promise<{
     return { userId: null, token: null };
   }
 
-  const token = await session.getToken();
+ const token = await session.getToken({ template: "default" });
 
   const userId =
     session.user?.id ||
