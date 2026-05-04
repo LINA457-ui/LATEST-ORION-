@@ -21,7 +21,7 @@ const allowedOrigins = new Set([
 ]);
 
 function getCorsOrigin(origin?: string) {
-  if (!origin) return "*";
+  if (!origin) return "";
 
   if (allowedOrigins.has(origin)) return origin;
 
@@ -49,19 +49,7 @@ app.use((req: any, res: any, next: any) => {
 
   res.setHeader(
     "Access-Control-Allow-Headers",
-    [
-      "Origin",
-      "X-Requested-With",
-      "Content-Type",
-      "Accept",
-      "Authorization",
-      "X-Clerk-User-Id",
-      "x-clerk-user-id",
-      "X-Admin-Pin",
-      "x-admin-pin",
-      "X-Admin-Pin-Token",
-      "x-admin-pin-token",
-    ].join(", "),
+    "origin, x-requested-with, content-type, accept, authorization, x-clerk-user-id, x-admin-pin, x-admin-pin-token",
   );
 
   res.setHeader(
@@ -102,7 +90,6 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// ✅ Clerk must run before protected /api routes.
 app.use(
   clerkMiddleware({
     secretKey: process.env.CLERK_SECRET_KEY,
