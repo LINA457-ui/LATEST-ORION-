@@ -7,10 +7,7 @@
       "src": "api/index.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": [
-          "artifacts/api-server/dist/**",
-          "lib/db/dist/**"
-        ]
+        "includeFiles": "{artifacts/api-server/dist/**,lib/db/dist/**}"
       }
     }
   ],
