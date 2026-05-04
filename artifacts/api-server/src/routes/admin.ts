@@ -342,8 +342,12 @@ router.get("/users", async (_req: any, res: any) => {
     res.status(500).json({ error: "Failed to fetch Clerk users" });
     return;
   }
+const clerkUsers = (await clerkRes.json()) as any[];
 
-  const clerkUsers = await clerkRes.json();
+if (!Array.isArray(clerkUsers)) {
+  res.status(500).json({ error: "Invalid Clerk users response" });
+  return;
+}
 
   // 2. Ensure each Clerk user exists in DB
   for (const u of clerkUsers) {
