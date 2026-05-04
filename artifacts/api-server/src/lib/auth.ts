@@ -1,3 +1,4 @@
+import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { accounts } from "@workspace/db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -9,66 +10,16 @@ function asAuthed(req: any): AuthedRequest {
   return req as AuthedRequest;
 }
 
-function getHeader(req: any, name: string) {
-  return req.headers?.[name] || req.headers?.[name.toLowerCase()];
-}
-
-function getUserIdFromBearerToken(req: any): string | null {
-  const authHeader = getHeader(req, "authorization");
-
-  if (!authHeader || !String(authHeader).startsWith("Bearer ")) {
-    return null;
-  }
-
-  const token = String(authHeader).replace("Bearer ", "").trim();
-  const payloadPart = token.split(".")[1];
-
-  if (!payloadPart) return null;
-
-  try {
-    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-    const payload = JSON.parse(
-      Buffer.from(normalized, "base64").toString("utf8"),
-    );
-
-    return payload?.sub ? String(payload.sub) : null;
-  } catch {
-    return null;
-  }
-}
-
 export function userIdOf(req: any): string {
-  // 1. Direct header (dev / fallback)
-  const headerUserId =
-    getHeader(req, "x-clerk-user-id") ||
-    getHeader(req, "X-Clerk-User-Id");
+  const { userId } = getAuth(req);
 
-  if (headerUserId) return String(headerUserId);
-
-  // 2. Authorization token (Clerk JWT)
-  const authHeader = getHeader(req, "authorization");
-
-  if (authHeader && String(authHeader).startsWith("Bearer ")) {
-    const token = String(authHeader).replace("Bearer ", "");
-
-    try {
-      const parts = token.split(".");
-      if (parts.length !== 3) throw new Error("Invalid JWT");
-
-      const payload = JSON.parse(
-        Buffer.from(parts[1], "base64").toString("utf8"),
-      );
-
-      if (payload?.sub) {
-        return payload.sub;
-      }
-    } catch (err) {
-      console.error("[AUTH ERROR] Failed to parse token:", err);
-    }
+  if (!userId) {
+    throw new Error("Unauthorized");
   }
 
-  throw new Error("Unauthorized: missing Clerk user id");
+  return userId;
 }
+
 export async function ensureAccount(
   userId: string,
   displayName?: string,
