@@ -2,7 +2,7 @@ import express from "express";
 import { db } from "@workspace/db";
 import { accounts, holdings, orders, transactions, watchlist, } from "@workspace/db/schema";
 import { and, desc, eq } from "drizzle-orm";
-import { ensureAccount, userIdOf } from "../lib/auth.js";
+import { requireAuth, ensureAccount, userIdOf } from "../lib/auth.js";
 import { getEquityCurve, getIndices, getMeta, getMovers, getNews, getQuote, POPULAR_SYMBOLS, } from "../lib/marketData.js";
 const AddToWatchlistBody = {
     parse(data) {
@@ -20,14 +20,7 @@ const GetAccountPerformanceQueryParams = {
     },
 };
 const router = express.Router();
-router.use((req, _res, next) => {
-    req.user = {
-        id: "demo-user",
-        userId: "demo-user",
-        sub: "demo-user",
-    };
-    next();
-});
+router.use(requireAuth);
 export async function getAccountSnapshot(userId) {
     const account = await ensureAccount(userId);
     const userHoldings = await db

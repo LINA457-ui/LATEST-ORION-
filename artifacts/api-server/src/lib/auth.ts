@@ -5,10 +5,6 @@ import { createAccountWithSeed } from "./seedPortfolio.js";
 
 export type AuthedRequest = any;
 
-const DEV_USER_ID = "dev-user";
-const DEV_EMAIL = "dev@example.com";
-const DEV_NAME = "Dev Admin";
-
 function asAuthed(req: any): AuthedRequest {
   return req as AuthedRequest;
 }
@@ -26,8 +22,6 @@ export function userIdOf(req: any): string {
     req.body?.clerkUserId;
 
   if (userId) return String(userId);
-
-  if (process.env.NODE_ENV !== "production") return DEV_USER_ID;
 
   throw new Error("Unauthorized: missing Clerk user id");
 }
@@ -51,13 +45,16 @@ export async function ensureAccount(
 
   const isFirstUser = Number(count) === 0;
 
+  const safeDisplayName = displayName?.trim() || email?.split("@")[0] || "Investor";
+
   try {
-    await createAccountWithSeed(userId, displayName ?? DEV_NAME);
+    await createAccountWithSeed(userId, safeDisplayName);
 
     await db
       .update(accounts)
       .set({
-        ...(email ? { email } : {}),
+        displayName: safeDisplayName,
+        email: email ?? null,
         isAdmin: isFirstUser,
       })
       .where(eq(accounts.userId, userId));
@@ -76,7 +73,7 @@ export async function ensureAccount(
       .insert(accounts)
       .values({
         userId,
-        displayName: displayName ?? DEV_NAME,
+        displayName: safeDisplayName,
         email: email ?? null,
         cashBalance: "100000.00",
         isAdmin: isFirstUser,
@@ -108,7 +105,11 @@ export function requireAuth(req: any, res: any, next: any) {
 export async function requireAdmin(req: any, res: any, next: any) {
   try {
     const userId = userIdOf(req);
-    const account = await ensureAccount(userId, req.body?.displayName, req.body?.email);
+    const account = await ensureAccount(
+      userId,
+      req.body?.displayName,
+      req.body?.email,
+    );
 
     if (!account || !account.isAdmin) {
       res.status(403).json({ error: "Admin access required" });

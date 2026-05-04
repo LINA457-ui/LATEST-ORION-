@@ -13,6 +13,9 @@ import { hashPin, issuePinToken, MAX_PINS, verifyPin } from "../lib/adminPin.js"
 
 const router: any = express.Router();
 
+// ✅ use real auth
+router.use(requireAuth);
+
 type AnyRow = any;
 
 type UserLookup = {
@@ -23,15 +26,7 @@ type UserLookup = {
 /**
  * TEMP FIX: bypass Clerk auth for now
  */
-router.use((req: any, _res: any, next: any) => {
-  req.user = {
-    id: "demo-user",
-    userId: "demo-user",
-    sub: "demo-user",
-  };
 
-  next();
-});
 
 // Public-to-admins check used by the frontend to gate the /admin nav link
 router.get("/check", async (req: any, res: any) => {
@@ -328,13 +323,70 @@ router.get("/overview", async (_req: any, res: any) => {
 });
 
 router.get("/users", async (_req: any, res: any) => {
+  const secretKey = process.env.CLERK_SECRET_KEY;
+
+  if (!secretKey) {
+    res.status(500).json({ error: "Missing CLERK_SECRET_KEY" });
+    return;
+  }
+
+  // 1. Fetch ALL Clerk users
+  const clerkRes = await fetch("https://api.clerk.com/v1/users?limit=100", {
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!clerkRes.ok) {
+    res.status(500).json({ error: "Failed to fetch Clerk users" });
+    return;
+  }
+
+  const clerkUsers = await clerkRes.json();
+
+  // 2. Ensure each Clerk user exists in DB
+  for (const u of clerkUsers) {
+    const userId = u.id;
+
+    const email =
+      u.email_addresses?.find(
+        (e: any) => e.id === u.primary_email_address_id,
+      )?.email_address ??
+      u.email_addresses?.[0]?.email_address ??
+      null;
+
+    const displayName =
+      [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+      u.username ||
+      email ||
+      "Investor";
+
+    const existing = await db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.userId, userId))
+      .limit(1);
+
+    if (!existing[0]) {
+      await db.insert(accounts).values({
+        userId,
+        displayName,
+        email,
+        cashBalance: "0.00",
+      });
+    }
+  }
+
+  // 3. Now fetch all DB accounts
   const allAccounts = await db
     .select()
     .from(accounts)
     .orderBy(desc(accounts.createdAt));
 
+  // 4. Compute values per user (your existing logic)
   const result = await Promise.all(
-    (allAccounts as AnyRow[]).map(async (a: AnyRow) => {
+    allAccounts.map(async (a: any) => {
       const userHoldings = await db
         .select()
         .from(holdings)
@@ -342,40 +394,24 @@ router.get("/users", async (_req: any, res: any) => {
 
       let portfolioValue = 0;
 
-      for (const h of userHoldings as AnyRow[]) {
+      for (const h of userHoldings) {
         const q = getQuote(h.symbol);
         if (q) portfolioValue += Number(h.quantity) * q.price;
       }
 
       const cash = Number(a.cashBalance);
-      const computedTotal = +(cash + portfolioValue).toFixed(2);
-
-      const displayedTotal =
-        a.equityOverride != null ? Number(a.equityOverride) : computedTotal;
-
-      const displayedPortfolio =
-        a.marketValueOverride != null
-          ? Number(a.marketValueOverride)
-          : +portfolioValue.toFixed(2);
+      const total = cash + portfolioValue;
 
       return {
         userId: a.userId,
         displayName: a.displayName,
         email: a.email,
-        avatarUrl: a.avatarUrl ?? null,
         cashBalance: cash,
-        portfolioValue: displayedPortfolio,
-        totalEquity: displayedTotal,
+        totalEquity: total,
         positionCount: userHoldings.length,
         isAdmin: a.isAdmin,
         isSuspended: a.isSuspended,
-        hasOverrides:
-          a.equityOverride != null ||
-          a.marketValueOverride != null ||
-          a.buyingPowerOverride != null ||
-          a.dayChangeOverride != null ||
-          a.dayChangePercentOverride != null,
-        createdAt: a.createdAt.toISOString(),
+        createdAt: a.createdAt,
       };
     }),
   );

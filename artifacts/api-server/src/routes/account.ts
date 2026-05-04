@@ -40,16 +40,9 @@ const GetAccountPerformanceQueryParams = {
 
 const router: any = express.Router();
 
-router.use((req: any, _res: any, next: any) => {
+router.use(requireAuth);
 
-  req.user = {
-    id: "demo-user",
-    userId: "demo-user",
-    sub: "demo-user",
-  };
 
-  next();
-});
 
 export type AccountSnapshot = {
   userId: string;

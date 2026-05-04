@@ -2,21 +2,15 @@ import express from "express";
 import { db } from "@workspace/db";
 import { accounts, adminPins, holdings, orders, transactions } from "@workspace/db/schema";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
-import { requirePinVerified, userIdOf, } from "../lib/auth.js";
+import { requireAuth, requirePinVerified, userIdOf, } from "../lib/auth.js";
 import { getMeta, getQuote } from "../lib/marketData.js";
 import { hashPin, issuePinToken, MAX_PINS, verifyPin } from "../lib/adminPin.js";
 const router = express.Router();
+// ✅ use real auth
+router.use(requireAuth);
 /**
  * TEMP FIX: bypass Clerk auth for now
  */
-router.use((req, _res, next) => {
-    req.user = {
-        id: "demo-user",
-        userId: "demo-user",
-        sub: "demo-user",
-    };
-    next();
-});
 // Public-to-admins check used by the frontend to gate the /admin nav link
 router.get("/check", async (req, res) => {
     const userId = userIdOf(req);
@@ -238,10 +232,53 @@ router.get("/overview", async (_req, res) => {
     });
 });
 router.get("/users", async (_req, res) => {
+    const secretKey = process.env.CLERK_SECRET_KEY;
+    if (!secretKey) {
+        res.status(500).json({ error: "Missing CLERK_SECRET_KEY" });
+        return;
+    }
+    // 1. Fetch ALL Clerk users
+    const clerkRes = await fetch("https://api.clerk.com/v1/users?limit=100", {
+        headers: {
+            Authorization: `Bearer ${secretKey}`,
+            "Content-Type": "application/json",
+        },
+    });
+    if (!clerkRes.ok) {
+        res.status(500).json({ error: "Failed to fetch Clerk users" });
+        return;
+    }
+    const clerkUsers = await clerkRes.json();
+    // 2. Ensure each Clerk user exists in DB
+    for (const u of clerkUsers) {
+        const userId = u.id;
+        const email = u.email_addresses?.find((e) => e.id === u.primary_email_address_id)?.email_address ??
+            u.email_addresses?.[0]?.email_address ??
+            null;
+        const displayName = [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+            u.username ||
+            email ||
+            "Investor";
+        const existing = await db
+            .select()
+            .from(accounts)
+            .where(eq(accounts.userId, userId))
+            .limit(1);
+        if (!existing[0]) {
+            await db.insert(accounts).values({
+                userId,
+                displayName,
+                email,
+                cashBalance: "0.00",
+            });
+        }
+    }
+    // 3. Now fetch all DB accounts
     const allAccounts = await db
         .select()
         .from(accounts)
         .orderBy(desc(accounts.createdAt));
+    // 4. Compute values per user (your existing logic)
     const result = await Promise.all(allAccounts.map(async (a) => {
         const userHoldings = await db
             .select()
@@ -254,28 +291,17 @@ router.get("/users", async (_req, res) => {
                 portfolioValue += Number(h.quantity) * q.price;
         }
         const cash = Number(a.cashBalance);
-        const computedTotal = +(cash + portfolioValue).toFixed(2);
-        const displayedTotal = a.equityOverride != null ? Number(a.equityOverride) : computedTotal;
-        const displayedPortfolio = a.marketValueOverride != null
-            ? Number(a.marketValueOverride)
-            : +portfolioValue.toFixed(2);
+        const total = cash + portfolioValue;
         return {
             userId: a.userId,
             displayName: a.displayName,
             email: a.email,
-            avatarUrl: a.avatarUrl ?? null,
             cashBalance: cash,
-            portfolioValue: displayedPortfolio,
-            totalEquity: displayedTotal,
+            totalEquity: total,
             positionCount: userHoldings.length,
             isAdmin: a.isAdmin,
             isSuspended: a.isSuspended,
-            hasOverrides: a.equityOverride != null ||
-                a.marketValueOverride != null ||
-                a.buyingPowerOverride != null ||
-                a.dayChangeOverride != null ||
-                a.dayChangePercentOverride != null,
-            createdAt: a.createdAt.toISOString(),
+            createdAt: a.createdAt,
         };
     }));
     res.json(result);
