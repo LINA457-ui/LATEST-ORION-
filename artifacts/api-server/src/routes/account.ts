@@ -42,12 +42,24 @@ const router: any = express.Router();
 
 router.use(requireAuth);
 
-
-
 export type AccountSnapshot = {
   userId: string;
+
+  accountNumber: string | null;
+  phone: string | null;
+  dateOfBirth: string | null;
+  addressLine1: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  postalCode: string | null;
+  employmentStatus: string | null;
+  sourceOfFunds: string | null;
+  investmentExperience: string | null;
+
   displayName: string | null;
   avatarUrl: string | null;
+
   cashBalance: number;
   totalEquity: number;
   portfolioValue: number;
@@ -59,6 +71,7 @@ export type AccountSnapshot = {
   displayedBuyingPower: number;
   displayedDayChange: number;
   displayedDayChangePercent: number;
+
   overrides: {
     equity: number | null;
     marketValue: number | null;
@@ -144,8 +157,22 @@ export async function getAccountSnapshot(
 
   return {
     userId,
+
+    accountNumber: account.accountNumber ?? null,
+    phone: account.phone ?? null,
+    dateOfBirth: account.dateOfBirth ?? null,
+    addressLine1: account.addressLine1 ?? null,
+    city: account.city ?? null,
+    state: account.state ?? null,
+    country: account.country ?? null,
+    postalCode: account.postalCode ?? null,
+    employmentStatus: account.employmentStatus ?? null,
+    sourceOfFunds: account.sourceOfFunds ?? null,
+    investmentExperience: account.investmentExperience ?? null,
+
     displayName: account.displayName ?? null,
     avatarUrl: account.avatarUrl ?? null,
+
     cashBalance,
     totalEquity: totalEquityDisplay,
     portfolioValue: portfolioValueDisplay,
@@ -547,6 +574,44 @@ router.get("/dashboard", async (req: any, res: any) => {
     recentTransactions,
     news: getNews(),
   });
+});
+
+router.patch("/profile", async (req: any, res: any) => {
+  const userId = userIdOf(req);
+
+  const {
+    phone,
+    dateOfBirth,
+    addressLine1,
+    city,
+    state,
+    country,
+    postalCode,
+    employmentStatus,
+    sourceOfFunds,
+    investmentExperience,
+  } = req.body ?? {};
+
+  await ensureAccount(userId);
+
+  const [updated] = await db
+    .update(accounts)
+    .set({
+      phone: phone || null,
+      dateOfBirth: dateOfBirth || null,
+      addressLine1: addressLine1 || null,
+      city: city || null,
+      state: state || null,
+      country: country || null,
+      postalCode: postalCode || null,
+      employmentStatus: employmentStatus || null,
+      sourceOfFunds: sourceOfFunds || null,
+      investmentExperience: investmentExperience || null,
+    })
+    .where(eq(accounts.userId, userId))
+    .returning();
+
+  res.json({ ok: true, account: updated });
 });
 
 export default router;

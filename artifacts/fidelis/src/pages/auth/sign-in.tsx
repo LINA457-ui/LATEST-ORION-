@@ -16,7 +16,7 @@ export default function SignInPage() {
         path="/sign-in"
         routing="path"
         signUpUrl="/sign-up"
-        forceRedirectUrl="/dashboard"
+        forceRedirectUrl="/auth/redirect"
         appearance={{
           baseTheme: theme === "dark" ? dark : undefined,
           elements: {

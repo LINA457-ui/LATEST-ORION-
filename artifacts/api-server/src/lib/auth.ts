@@ -10,6 +10,28 @@ function asAuthed(req: any): AuthedRequest {
   return req as AuthedRequest;
 }
 
+function generateAccountNumber() {
+  return Math.floor(1000000000 + Math.random() * 9000000000).toString();
+}
+
+async function generateUniqueAccountNumber() {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const accountNumber = generateAccountNumber();
+
+    const existing = await db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.accountNumber, accountNumber))
+      .limit(1);
+
+    if (!existing[0]) {
+      return accountNumber;
+    }
+  }
+
+  throw new Error("Failed to generate unique account number");
+}
+
 export function userIdOf(req: any): string {
   const { userId } = getAuth(req);
 
@@ -31,7 +53,21 @@ export async function ensureAccount(
     .where(eq(accounts.userId, userId))
     .limit(1);
 
-  if (existing[0]) return existing[0];
+  if (existing[0]) {
+    if (!existing[0].accountNumber) {
+      const accountNumber = await generateUniqueAccountNumber();
+
+      const [updated] = await db
+        .update(accounts)
+        .set({ accountNumber })
+        .where(eq(accounts.userId, userId))
+        .returning();
+
+      return updated ?? existing[0];
+    }
+
+    return existing[0];
+  }
 
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -41,17 +77,23 @@ export async function ensureAccount(
   const safeDisplayName =
     displayName?.trim() || email?.split("@")[0] || "Investor";
 
+  const accountNumber = await generateUniqueAccountNumber();
+
   try {
     await createAccountWithSeed(userId, safeDisplayName);
 
-    await db
+    const [updated] = await db
       .update(accounts)
       .set({
+        accountNumber,
         displayName: safeDisplayName,
         email: email ?? null,
         isAdmin: isFirstUser,
       })
-      .where(eq(accounts.userId, userId));
+      .where(eq(accounts.userId, userId))
+      .returning();
+
+    if (updated) return updated;
 
     const [final] = await db
       .select()
@@ -67,6 +109,7 @@ export async function ensureAccount(
       .insert(accounts)
       .values({
         userId,
+        accountNumber,
         displayName: safeDisplayName,
         email: email ?? null,
         cashBalance: "0.00",
@@ -82,6 +125,18 @@ export async function ensureAccount(
       .from(accounts)
       .where(eq(accounts.userId, userId))
       .limit(1);
+
+    if (afterConflict && !afterConflict.accountNumber) {
+      const newAccountNumber = await generateUniqueAccountNumber();
+
+      const [updated] = await db
+        .update(accounts)
+        .set({ accountNumber: newAccountNumber })
+        .where(eq(accounts.userId, userId))
+        .returning();
+
+      return updated ?? afterConflict;
+    }
 
     return afterConflict;
   }

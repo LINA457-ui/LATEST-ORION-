@@ -31,6 +31,8 @@ import AdminUserDetail from "@/pages/admin/user-detail";
 import AdminOrders from "@/pages/admin/orders";
 import AdminTransactions from "@/pages/admin/transactions";
 import AdminPins from "@/pages/admin/pins";
+import AuthRedirectPage from "@/pages/auth/redirect";
+import CompleteProfilePage from "@/pages/complete-profile/page";
 
 function ProfileSyncer() {
   useSyncProfile();
@@ -43,6 +45,8 @@ function Router() {
       <Route path="/" component={Marketing} />
       <Route path="/sign-in/:rest*" component={SignIn} />
 <Route path="/sign-in" component={SignIn} />
+<Route path="/auth/redirect" component={AuthRedirectPage} />
+<Route path="/complete-profile" component={CompleteProfilePage} />
 
 <Route path="/sign-up/:rest*" component={SignUp} />
 <Route path="/sign-up" component={SignUp} />

@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
-import { useGetMyAccount } from "@workspace/api-client-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Trash2, Upload } from "lucide-react";
 
 import { adminApi } from "@/lib/adminApi";
@@ -19,24 +18,36 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 
-type AccountShape = {
-  userId?: string | null;
-  avatarUrl?: string | null;
-  totalEquity?: number | string | null;
-  cashBalance?: number | string | null;
-  buyingPower?: number | string | null;
-};
-
 function safeNumber(value: unknown, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
 
-export default function ProfilePage() {
-  const { user } = useUser();
-  const { data: rawAccount } = useGetMyAccount();
+function show(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : "Not provided";
+}
 
-  const account = rawAccount as AccountShape | undefined;
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Failed to read image file"));
+
+    reader.readAsDataURL(file);
+  });
+}
+
+export default function ProfilePage() {
+  const { user, isLoaded, isSignedIn } = useUser();
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: () => adminApi.dashboard(),
+    enabled: isLoaded && isSignedIn,
+  });
+
+  const account = data?.account;
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -44,19 +55,8 @@ export default function ProfilePage() {
 
   const [busy, setBusy] = useState(false);
 
-  const customAvatar = account?.avatarUrl ?? null;
-  const avatarSrc = customAvatar || user?.imageUrl || "";
-
-  const accountNumber =
-    typeof account?.userId === "string" && account.userId.length > 0
-      ? account.userId.slice(-10).toUpperCase()
-      : "INV-00012345";
-
-  const totalEquity = safeNumber(account?.totalEquity, 100000);
-  const cashBalance = safeNumber(account?.cashBalance, 100000);
-  const buyingPower = safeNumber(account?.buyingPower, 100000);
-
   const refreshAccount = () => {
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["/api/account/me"] });
     queryClient.invalidateQueries({ queryKey: ["/api/account/dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["account"] });
@@ -64,16 +64,11 @@ export default function ProfilePage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("avatar", file);
-
-      return adminApi.uploadAvatar(formData);
+      const avatarUrl = await fileToDataUrl(file);
+      return adminApi.uploadAvatar(avatarUrl);
     },
     onSuccess: () => {
-      toast({
-        title: "Profile picture updated",
-      });
-
+      toast({ title: "Profile picture updated" });
       refreshAccount();
     },
     onError: (error: Error) => {
@@ -83,23 +78,15 @@ export default function ProfilePage() {
         variant: "destructive",
       });
     },
-    onSettled: () => {
-      setBusy(false);
-    },
+    onSettled: () => setBusy(false),
   });
 
   const removeMutation = useMutation({
     mutationFn: async () => {
-      const formData = new FormData();
-      formData.append("remove", "true");
-
-      return adminApi.uploadAvatar(formData);
+      return adminApi.uploadAvatar(null);
     },
     onSuccess: () => {
-      toast({
-        title: "Profile picture removed",
-      });
-
+      toast({ title: "Profile picture removed" });
       refreshAccount();
     },
     onError: (error: Error) => {
@@ -111,20 +98,57 @@ export default function ProfilePage() {
     },
   });
 
-  if (!user) {
-    return null;
+  if (!isLoaded) return <div className="p-6">Loading profile...</div>;
+
+  if (!isSignedIn || !user) {
+    return <div className="p-6">Please sign in to view your profile.</div>;
   }
+
+  if (isLoading) return <div className="p-6">Loading account details...</div>;
+
+  if (isError || !account) {
+    return (
+      <div className="p-6">
+        <h2 className="text-xl font-bold">Profile unavailable</h2>
+        <p className="mt-2 text-muted-foreground">
+          Could not load your account profile.
+        </p>
+      </div>
+    );
+  }
+
+  const customAvatar = account.avatarUrl ?? null;
+  const avatarSrc = customAvatar || user.imageUrl || "";
+
+  const displayName =
+    account.displayName ||
+    user.fullName ||
+    user.username ||
+    user.firstName ||
+    "Investor User";
+
+  const email =
+    account.email || user.primaryEmailAddress?.emailAddress || "user@example.com";
+
+  const accountNumber = account.accountNumber || "Not available";
+
+  const totalEquity = safeNumber(account.totalEquity, 0);
+  const portfolioValue = safeNumber(account.portfolioValue, 0);
+  const cashBalance = safeNumber(account.cashBalance, 0);
+  const buyingPower = safeNumber(account.buyingPower, 0);
 
   const isUploading = busy || uploadMutation.isPending;
   const isRemoving = removeMutation.isPending;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 pb-8">
+    <div className="mx-auto max-w-5xl space-y-6 pb-8">
       <div>
         <h1 className="text-3xl font-serif font-bold tracking-tight">
           Profile
         </h1>
-        <p className="text-muted-foreground">Manage your account details</p>
+        <p className="text-muted-foreground">
+          Manage your account and registration details
+        </p>
       </div>
 
       <Card>
@@ -132,10 +156,8 @@ export default function ProfilePage() {
           <div className="relative">
             <Avatar className="h-20 w-20">
               {avatarSrc ? <AvatarImage src={avatarSrc} /> : null}
-
               <AvatarFallback className="bg-primary text-2xl font-bold text-primary-foreground">
-                {user.firstName?.[0] || "U"}
-                {user.lastName?.[0] || ""}
+                {displayName?.[0]?.toUpperCase() || "U"}
               </AvatarFallback>
             </Avatar>
 
@@ -157,9 +179,7 @@ export default function ProfilePage() {
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 event.target.value = "";
-
                 if (!file) return;
-
                 setBusy(true);
                 uploadMutation.mutate(file);
               }}
@@ -167,12 +187,9 @@ export default function ProfilePage() {
           </div>
 
           <div className="min-w-0">
-            <CardTitle className="truncate text-2xl">
-              {user.fullName || "Investor User"}
-            </CardTitle>
-
+            <CardTitle className="truncate text-2xl">{displayName}</CardTitle>
             <CardDescription className="truncate text-base">
-              {user.primaryEmailAddress?.emailAddress || "user@example.com"}
+              {email}
             </CardDescription>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -208,37 +225,70 @@ export default function ProfilePage() {
             <h3 className="mb-4 text-lg font-bold">Account Snapshot</h3>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded-lg border bg-muted/30 p-4">
-                <div className="mb-1 text-sm text-muted-foreground">
-                  Account Number
-                </div>
-                <div className="font-mono">{accountNumber}</div>
-              </div>
+              <Info label="Account Number" value={accountNumber} mono />
+              <Info label="Total Equity" value={formatCurrency(totalEquity)} />
+              <Info label="Portfolio Value" value={formatCurrency(portfolioValue)} />
+              <Info label="Available Cash" value={formatCurrency(cashBalance)} />
+              <Info label="Buying Power" value={formatCurrency(buyingPower)} wide />
+            </div>
+          </div>
 
-              <div className="rounded-lg border bg-muted/30 p-4">
-                <div className="mb-1 text-sm text-muted-foreground">
-                  Total Equity
-                </div>
-                <div className="font-bold">{formatCurrency(totalEquity)}</div>
-              </div>
+          <Separator />
 
-              <div className="rounded-lg border bg-muted/30 p-4">
-                <div className="mb-1 text-sm text-muted-foreground">
-                  Available Cash
-                </div>
-                <div className="font-bold">{formatCurrency(cashBalance)}</div>
-              </div>
+          <div>
+            <h3 className="mb-4 text-lg font-bold">Registration Details</h3>
 
-              <div className="rounded-lg border bg-muted/30 p-4">
-                <div className="mb-1 text-sm text-muted-foreground">
-                  Buying Power
-                </div>
-                <div className="font-bold">{formatCurrency(buyingPower)}</div>
-              </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Info label="Full Name" value={show(displayName)} />
+              <Info label="Email Address" value={show(email)} />
+              <Info label="Phone Number" value={show(account.phone)} />
+              <Info label="Date of Birth" value={show(account.dateOfBirth)} />
+              <Info label="Country" value={show(account.country)} />
+              <Info label="State" value={show(account.state)} />
+              <Info label="City" value={show(account.city)} />
+              <Info label="Postal Code" value={show(account.postalCode)} />
+              <Info label="Home Address" value={show(account.addressLine1)} wide />
+            </div>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h3 className="mb-4 text-lg font-bold">Investor Profile</h3>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Info
+                label="Employment Status"
+                value={show(account.employmentStatus)}
+              />
+              <Info label="Source of Funds" value={show(account.sourceOfFunds)} />
+              <Info
+                label="Investment Experience"
+                value={show(account.investmentExperience)}
+              />
             </div>
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function Info({
+  label,
+  value,
+  mono = false,
+  wide = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  wide?: boolean;
+}) {
+  return (
+    <div className={`rounded-lg border bg-muted/30 p-4 ${wide ? "md:col-span-2" : ""}`}>
+      <div className="mb-1 text-sm text-muted-foreground">{label}</div>
+      <div className={`font-bold ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>
   );
 }

@@ -1,5 +1,3 @@
-import { get } from "node:http";
-
 const BASE =
   import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
 
@@ -40,7 +38,7 @@ async function getClerkAuth(): Promise<{
     return { userId: null, token: null };
   }
 
- const token = await session.getToken();
+  const token = await session.getToken();
 
   const userId =
     session.user?.id ||
@@ -63,6 +61,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: HeadersInit = {
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
     Authorization: `Bearer ${token}`,
+    "x-clerk-user-id": userId,
     ...(options.headers || {}),
   };
 
@@ -77,13 +76,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
     try {
       const body = await res.json();
-      message = body?.error || body?.details || message;
+      message = body?.error || body?.details || body?.message || message;
     } catch {}
 
     throw new Error(message);
   }
 
-  if (res.status === 204) return undefined as T;
+  if (res.status === 204) {
+    return undefined as T;
+  }
 
   return res.json();
 }
@@ -104,9 +105,15 @@ export const adminApi = {
 
   dashboard: () => request<any>("/api/account/dashboard"),
 
-  me: () => request<any>("/api/account/me"),
+ me: () => request<any>("/api/account/me"),
 
-  check: () => request<{ isAdmin: boolean }>("/api/admin/check"),
+updateProfile: (body: any) =>
+  request("/api/account/profile", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  }),
+
+check: () => request<{ isAdmin: boolean }>("/api/admin/check"),
 
   verifyPin: async (_pin: string) => {
     return { ok: true, token: "" };
@@ -146,11 +153,11 @@ export const adminApi = {
   deleteHolding: (userId: string, symbol: string) =>
     request(
       `/api/admin/users/${encodeURIComponent(
-        userId,
+        userId
       )}/holdings/${encodeURIComponent(symbol)}`,
       {
         method: "DELETE",
-      },
+      }
     ),
 
   createTransaction: (userId: string, data: any) =>
@@ -169,11 +176,11 @@ export const adminApi = {
       method: "DELETE",
     }),
 
-  uploadAvatar: (formData: FormData) =>
-    request("/api/account/avatar", {
-      method: "POST",
-      body: formData,
-    }),
+uploadAvatar: (avatarUrl: string | null) =>
+  request("/api/account/avatar", {
+    method: "POST",
+    body: JSON.stringify({ avatarUrl }),
+  }),
 
   transactions: () => request<any[]>("/api/admin/transactions"),
 

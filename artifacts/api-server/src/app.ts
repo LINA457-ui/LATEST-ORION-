@@ -15,6 +15,7 @@ app.set("etag", false);
 const allowedOrigins = new Set([
   "http://localhost:5173",
   "http://localhost:5000",
+  "http://localhost:5174",
   "https://www.investmentorion.com",
   "https://investmentorion.com",
   "https://latest-orion-api-server.vercel.app",
